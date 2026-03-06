@@ -26,9 +26,9 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: clip2article
-      POSTGRES_USER: clip2article
-      POSTGRES_PASSWORD: clip2article
+      POSTGRES_DB: vidscribe
+      POSTGRES_USER: vidscribe
+      POSTGRES_PASSWORD: vidscribe
     ports:
       - "5432:5432"
     volumes:

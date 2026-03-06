@@ -1,1 +1,1 @@
-"""Clip2Article application package."""
+"""VidScribe application package."""

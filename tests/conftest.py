@@ -1,6 +1,6 @@
 import os
 
-os.environ["DATABASE_URL"] = "sqlite+pysqlite:///./test_clip2article.db"
+os.environ["DATABASE_URL"] = "sqlite+pysqlite:///./test_vidscribe.db"
 os.environ["CELERY_BROKER_URL"] = "memory://"
 os.environ["CELERY_RESULT_BACKEND"] = "cache+memory://"
 

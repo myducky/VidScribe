@@ -1,6 +1,6 @@
 # VidScribe
 
-VidScribe, also packaged here as Clip2Article, is a FastAPI + Celery service that turns Douyin links, pasted text, or uploaded videos into a WeChat official account article package.
+VidScribe is a FastAPI + Celery service that turns Douyin links, pasted text, or uploaded videos into a WeChat official account article package.
 
 ## Implementation Plan
 1. Phase 1: make `raw_text` fully runnable through `/v1/analyze-text` and the async pipeline.
@@ -60,7 +60,7 @@ docker-compose up --build
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-export DATABASE_URL=sqlite+pysqlite:///./clip2article.db
+export DATABASE_URL=sqlite+pysqlite:///./vidscribe.db
 export CELERY_BROKER_URL=redis://localhost:6379/0
 export CELERY_RESULT_BACKEND=redis://localhost:6379/1
 uvicorn app.main:app --reload

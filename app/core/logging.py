@@ -29,4 +29,4 @@ def configure_logging() -> None:
     )
 
 
-logger = logging.getLogger("clip2article")
+logger = logging.getLogger("vidscribe")
