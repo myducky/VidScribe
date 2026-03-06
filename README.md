@@ -55,6 +55,11 @@ If no OpenAI-compatible API is configured, the app falls back to a deterministic
 docker compose up --build
 ```
 
+For day-to-day development, keep a second terminal on:
+```bash
+docker compose logs -f api worker
+```
+
 ### 3. Run the API locally without Docker
 ```bash
 python3 -m venv .venv
@@ -77,11 +82,12 @@ celery -A app.core.celery_app.celery_app worker --loglevel=info
 ### 5. Open the API UI
 After startup, use:
 ```text
+http://127.0.0.1:8000/
 http://127.0.0.1:8000/docs
 ```
 
 Notes:
-- `http://127.0.0.1:8000/` does not serve a homepage
+- `http://127.0.0.1:8000/` is a lightweight developer landing page with links to docs and health checks
 - `http://127.0.0.1:8000/health` is the basic health check
 - `http://127.0.0.1:8000/v1/health` is the versioned health check
 
@@ -89,6 +95,18 @@ Notes:
 ```bash
 docker compose up --build
 docker compose exec api pytest
+```
+
+For local-only runs outside Docker, a practical loop is:
+```bash
+source .venv/bin/activate
+uvicorn app.main:app --reload
+```
+
+In another terminal:
+```bash
+source .venv/bin/activate
+celery -A app.core.celery_app.celery_app worker --loglevel=info
 ```
 
 ## Example API Requests
