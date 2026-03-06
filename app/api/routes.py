@@ -131,5 +131,5 @@ async def analyze_video(
     try:
         result = service.run_video_analysis(db, target_path)
     except InvalidMediaError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     return AnalyzeVideoResponse.model_validate(result.model_dump(mode="json"))
