@@ -52,7 +52,7 @@ If no OpenAI-compatible API is configured, the app falls back to a deterministic
 
 ### 2. Start services
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 ### 3. Run the API locally without Docker
@@ -74,10 +74,21 @@ celery -A app.core.celery_app.celery_app worker --loglevel=info
 
 `/v1/jobs` requires a reachable Celery broker and a running worker. In local development that means Redis must be running before you submit a job. Celery task results are not used by this app, so the Redis result backend is optional for request submission. The `.env.example` values point at Docker service names, so for non-Docker local runs you must override them to `localhost` as shown above.
 
+### 5. Open the API UI
+After startup, use:
+```text
+http://127.0.0.1:8000/docs
+```
+
+Notes:
+- `http://127.0.0.1:8000/` does not serve a homepage
+- `http://127.0.0.1:8000/health` is the basic health check
+- `http://127.0.0.1:8000/v1/health` is the versioned health check
+
 ## Startup Commands
 ```bash
-docker-compose up --build
-docker-compose exec api pytest
+docker compose up --build
+docker compose exec api pytest
 ```
 
 ## Example API Requests
