@@ -27,6 +27,29 @@ VidScribe, also packaged here as Clip2Article, is a FastAPI + Celery service tha
 cp .env.example .env
 ```
 
+### 1.1 Configure model access
+The service uses an OpenAI-compatible chat API for summarization and article generation.
+
+Default settings:
+- `OPENAI_MODEL=gpt-4o-mini`
+- `OPENAI_TIMEOUT_SEC=60`
+- `WHISPER_MODEL=base`
+
+Required LLM environment variables:
+```env
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_API_KEY=your_api_key
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TIMEOUT_SEC=60
+```
+
+If you use an OpenAI-compatible gateway, keep the same variable names and replace:
+- `OPENAI_BASE_URL`
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+
+If no OpenAI-compatible API is configured, the app falls back to a deterministic local generator so `/health`, `/v1/analyze-text`, and the async pipeline remain runnable in development.
+
 ### 2. Start services
 ```bash
 docker-compose up --build
