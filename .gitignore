@@ -1,12 +1,87 @@
 .DS_Store
-.env
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+UNKNOWN.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
 .pytest_cache/
+cover/
+
+# Local environments and secrets
+.env
+.envrc
 .venv/
 .localpython311/
 .tools/
-UNKNOWN.egg-info/
-*.egg-info/
-__pycache__/
-*.py[cod]
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Local runtime data
 *.db
 storage/
+instance/
+
+# Project/tool caches
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+.pdm-python
+.pdm-build/
+.pixi
+__pypackages__/
+celerybeat-schedule
+celerybeat.pid
+cython_debug/
+.abstra/
+.cursorignore
+.cursorindexingignore
+marimo/_static/
+marimo/_lsp/
+__marimo__/

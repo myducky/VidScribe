@@ -1,6 +1,6 @@
-# Clip2Article
+# VidScribe
 
-Clip2Article is a FastAPI + Celery MVP that turns Douyin links, pasted text, or uploaded videos into a WeChat official account article package.
+VidScribe, also packaged here as Clip2Article, is a FastAPI + Celery service that turns Douyin links, pasted text, or uploaded videos into a WeChat official account article package.
 
 ## Implementation Plan
 1. Phase 1: make `raw_text` fully runnable through `/v1/analyze-text` and the async pipeline.
