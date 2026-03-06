@@ -1,0 +1,44 @@
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    app_name: str = Field(default="Clip2Article", alias="APP_NAME")
+    app_env: str = Field(default="development", alias="APP_ENV")
+    app_host: str = Field(default="0.0.0.0", alias="APP_HOST")
+    app_port: int = Field(default=8000, alias="APP_PORT")
+    api_prefix: str = Field(default="/v1", alias="API_PREFIX")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    database_url: str = Field(
+        default="sqlite+pysqlite:///./clip2article.db",
+        alias="DATABASE_URL",
+    )
+    redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    celery_broker_url: str = Field(default="redis://localhost:6379/0", alias="CELERY_BROKER_URL")
+    celery_result_backend: str | None = Field(default="redis://localhost:6379/1", alias="CELERY_RESULT_BACKEND")
+
+    openai_base_url: str | None = Field(default=None, alias="OPENAI_BASE_URL")
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
+    openai_timeout_sec: int = Field(default=60, alias="OPENAI_TIMEOUT_SEC")
+
+    whisper_model: str = Field(default="base", alias="WHISPER_MODEL")
+    storage_dir: str = Field(default="storage", alias="STORAGE_DIR")
+    max_upload_mb: int = Field(default=300, alias="MAX_UPLOAD_MB")
+
+    @property
+    def storage_path(self) -> Path:
+        path = Path(self.storage_dir)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

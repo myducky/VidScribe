@@ -1,0 +1,4 @@
+{
+  "input_type": "raw_text",
+  "raw_text": "这是一段可直接提交异步任务的示例文本，适合验证 jobs API、状态追踪与结果导出。"
+}

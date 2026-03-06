@@ -1,0 +1,12 @@
+.DS_Store
+.env
+.pytest_cache/
+.venv/
+.localpython311/
+.tools/
+UNKNOWN.egg-info/
+*.egg-info/
+__pycache__/
+*.py[cod]
+*.db
+storage/
