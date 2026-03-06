@@ -144,10 +144,10 @@ def home() -> str:
     <main>
       <section class="hero">
         <span class="eyebrow">VidScribe API</span>
-        <h1>把文本、视频或网页链接整理成可发布文章。</h1>
+        <h1>把 B 站视频、文本或本地视频整理成中文公众号文章。</h1>
         <p class="lead">
-          这是一个基于 FastAPI + Celery 的内容整理服务，支持文本分析、视频转写和异步任务。
-          如果你要用网页链接，优先推荐公开的 B 站视频链接；抖音链接只做尽力解析。
+          这是一个基于 FastAPI + Celery 的内容整理服务，支持远程视频探测、视频转写、内容提炼和公众号成稿。
+          当前优先推荐公开的 B 站视频链接；抖音仅做尽力解析，后续会逐步扩展到 YouTube 等公开视频网站与多语种转中文成稿能力。
         </p>
         <div class="actions">
           <a class="button primary" href="/docs">打开 Swagger UI</a>
@@ -159,15 +159,15 @@ def home() -> str:
       <section class="grid">
         <article class="card">
           <h2>核心接口</h2>
-          <p>主流程使用 <code>POST {settings.api_prefix}/analyze-text</code>、<code>POST {settings.api_prefix}/analyze-video</code>、<code>POST {settings.api_prefix}/analyze-remote-video</code> 和 <code>POST {settings.api_prefix}/jobs</code>。探测网页链接时使用 <code>POST {settings.api_prefix}/probe-video-url</code>。</p>
+          <p>直接分析文本用 <code>POST {settings.api_prefix}/analyze-text</code>，上传视频用 <code>POST {settings.api_prefix}/analyze-video</code>，远程视频链接用 <code>POST {settings.api_prefix}/analyze-remote-video</code>，异步任务用 <code>POST {settings.api_prefix}/jobs</code>。探测网页链接时使用 <code>POST {settings.api_prefix}/probe-video-url</code>。</p>
         </article>
         <article class="card">
           <h2>本地开发</h2>
-          <p>执行 <code>docker compose up --build</code> 启动完整栈，或分别启动 FastAPI 和 Celery worker 进行本地调试。</p>
+          <p>执行 <code>docker compose up --build</code> 启动完整栈。修改首页或 API 代码后，需要重启或重建容器，浏览器页面才会更新。</p>
         </article>
         <article class="card">
           <h2>使用建议</h2>
-          <p>优先使用公开的 B 站视频链接。抖音解析成功率较低，建议同时准备 <code>raw_text</code> 或本地上传视频作为回退输入。</p>
+          <p>优先使用公开的 B 站视频链接。抖音解析成功率较低，建议同时准备 <code>raw_text</code> 或本地上传视频作为回退输入；后续会支持更多公开视频站点和多语种转中文成稿。</p>
         </article>
       </section>
     </main>
