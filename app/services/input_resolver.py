@@ -9,6 +9,7 @@ class InputResolver:
         input_type: InputType,
         *,
         raw_text: str | None = None,
+        bilibili_url: str | None = None,
         douyin_url: str | None = None,
         file_path: Path | None = None,
     ) -> dict:
@@ -16,6 +17,11 @@ class InputResolver:
             if not raw_text:
                 raise ValueError("raw_text is required")
             return {"input_type": input_type.value, "raw_text": raw_text}
+
+        if input_type == InputType.BILIBILI_URL:
+            if not bilibili_url:
+                raise ValueError("bilibili_url is required")
+            return {"input_type": input_type.value, "bilibili_url": bilibili_url}
 
         if input_type == InputType.DOUYIN_URL:
             if not douyin_url:

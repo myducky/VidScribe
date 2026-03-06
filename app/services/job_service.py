@@ -8,7 +8,8 @@ from app.core.config import Settings
 from app.core.enums import InputType, JobStatus
 from app.models.job import Job
 from app.schemas.common import JobResultSchema
-from app.schemas.requests import AnalyzeTextRequest, CreateJobRequest
+from app.schemas.requests import AnalyzeRemoteVideoRequest, AnalyzeTextRequest, CreateJobRequest
+from app.schemas.responses import AnalyzeRemoteVideoResponse, DouyinProbeResponse, VideoProbeResponse
 from app.services.article_writer import ArticleWriter
 from app.services.cover_prompt_generator import CoverPromptGenerator
 from app.services.input_resolver import InputResolver
@@ -28,7 +29,7 @@ class JobService:
         llm_client = LLMClient(settings)
         deps = PipelineDependencies(
             input_resolver=InputResolver(),
-            video_downloader=VideoDownloader(),
+            video_downloader=VideoDownloader(settings),
             audio_extractor=AudioExtractor(),
             transcriber=Transcriber(settings),
             transcript_cleaner=TranscriptCleaner(),
@@ -90,3 +91,74 @@ class JobService:
         db.commit()
         db.refresh(job)
         return self.pipeline.run(db, job, file_path=file_path)
+
+    def run_remote_video_analysis(self, db: Session, payload: AnalyzeRemoteVideoRequest) -> AnalyzeRemoteVideoResponse:
+        platform = self.pipeline.deps.video_downloader.detect_platform(payload.video_url)
+        if platform == "bilibili":
+            input_type = InputType.BILIBILI_URL
+            input_payload = {
+                "bilibili_url": payload.video_url,
+                "raw_text": payload.raw_text,
+                "desired_length": payload.desired_length,
+                "language": payload.language,
+            }
+            job = Job(input_type=input_type, status=JobStatus.PENDING, input_payload=input_payload)
+            db.add(job)
+            db.commit()
+            db.refresh(job)
+            result = self.pipeline.run(
+                db,
+                job,
+                bilibili_url=payload.video_url,
+                raw_text=payload.raw_text,
+                desired_length=payload.desired_length,
+                language=payload.language,
+            )
+            return AnalyzeRemoteVideoResponse.model_validate(result.model_dump(mode="json"))
+
+        if platform == "douyin":
+            input_type = InputType.DOUYIN_URL
+            input_payload = {
+                "douyin_url": payload.video_url,
+                "raw_text": payload.raw_text,
+                "desired_length": payload.desired_length,
+                "language": payload.language,
+            }
+            job = Job(input_type=input_type, status=JobStatus.PENDING, input_payload=input_payload)
+            db.add(job)
+            db.commit()
+            db.refresh(job)
+            result = self.pipeline.run(
+                db,
+                job,
+                douyin_url=payload.video_url,
+                raw_text=payload.raw_text,
+                desired_length=payload.desired_length,
+                language=payload.language,
+            )
+            return AnalyzeRemoteVideoResponse.model_validate(result.model_dump(mode="json"))
+
+        raise ValueError("Unsupported remote video URL. Use a public Bilibili link, or upload the video directly.")
+
+    def probe_douyin_url(self, douyin_url: str) -> DouyinProbeResponse:
+        result = self.pipeline.deps.video_downloader.probe_douyin_url(douyin_url)
+        return DouyinProbeResponse(
+            input_url=result.input_url,
+            normalized_url=result.normalized_url,
+            downloadable=result.downloadable,
+            reason_code=result.reason_code,
+            detail=result.detail,
+            resolved_video_id=result.resolved_video_id,
+        )
+
+    def probe_video_url(self, video_url: str) -> VideoProbeResponse:
+        result = self.pipeline.deps.video_downloader.probe_video_url(video_url)
+        return VideoProbeResponse(
+            platform=result.platform,
+            input_url=result.input_url,
+            normalized_url=result.normalized_url,
+            downloadable=result.downloadable,
+            reason_code=result.reason_code,
+            detail=result.detail,
+            resolved_video_id=result.resolved_video_id,
+        )

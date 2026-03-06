@@ -11,8 +11,23 @@ from app.core.errors import InvalidMediaError
 from app.core.logging import logger
 from app.models.job import Job
 from app.schemas.common import JobResultSchema, JobStatusResponse, JobStepSchema
-from app.schemas.requests import AnalyzeTextRequest, CreateJobRequest
-from app.schemas.responses import AnalyzeTextResponse, AnalyzeVideoResponse, CreateJobResponse, HealthResponse, JobDetailResponse
+from app.schemas.requests import (
+    AnalyzeRemoteVideoRequest,
+    AnalyzeTextRequest,
+    CreateJobRequest,
+    DouyinProbeRequest,
+    VideoProbeRequest,
+)
+from app.schemas.responses import (
+    AnalyzeRemoteVideoResponse,
+    AnalyzeTextResponse,
+    AnalyzeVideoResponse,
+    CreateJobResponse,
+    DouyinProbeResponse,
+    HealthResponse,
+    JobDetailResponse,
+    VideoProbeResponse,
+)
 from app.services.job_service import JobService
 from app.tasks.jobs import process_job
 from app.utils.files import generate_upload_filename
@@ -92,6 +107,34 @@ def analyze_text(
     service: JobService = Depends(get_job_service),
 ) -> AnalyzeTextResponse:
     return AnalyzeTextResponse.model_validate(service.run_text_analysis(db, payload).model_dump(mode="json"))
+
+
+@router.post("/analyze-remote-video", response_model=AnalyzeRemoteVideoResponse, tags=["analysis"])
+def analyze_remote_video(
+    payload: AnalyzeRemoteVideoRequest,
+    db: Session = Depends(get_db),
+    service: JobService = Depends(get_job_service),
+) -> AnalyzeRemoteVideoResponse:
+    try:
+        return service.run_remote_video_analysis(db, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/probe-douyin", response_model=DouyinProbeResponse, tags=["analysis"])
+def probe_douyin(
+    payload: DouyinProbeRequest,
+    service: JobService = Depends(get_job_service),
+) -> DouyinProbeResponse:
+    return service.probe_douyin_url(payload.douyin_url)
+
+
+@router.post("/probe-video-url", response_model=VideoProbeResponse, tags=["analysis"])
+def probe_video_url(
+    payload: VideoProbeRequest,
+    service: JobService = Depends(get_job_service),
+) -> VideoProbeResponse:
+    return service.probe_video_url(payload.video_url)
 
 
 @router.post("/analyze-video", response_model=AnalyzeVideoResponse, tags=["analysis"])

@@ -119,6 +119,28 @@ def test_create_job_accepts_douyin_url_with_raw_text_fallback(client, monkeypatc
     assert len(captured_job_ids) == 1
 
 
+def test_create_job_accepts_bilibili_url_with_raw_text_fallback(client, monkeypatch):
+    captured_job_ids: list[str] = []
+
+    def fake_delay(job_id: str) -> object:
+        captured_job_ids.append(job_id)
+        return object()
+
+    monkeypatch.setattr(process_job, "delay", fake_delay)
+
+    response = client.post(
+        "/v1/jobs",
+        json={
+            "input_type": "bilibili_url",
+            "bilibili_url": "https://www.bilibili.com/video/BV1S5PrzZEzQ",
+            "raw_text": "这是一段备用文本，用于在 B 站下载失败后继续完成任务处理流程。" * 2,
+        },
+    )
+
+    assert response.status_code == 202
+    assert len(captured_job_ids) == 1
+
+
 def test_get_job_detail_and_result(client, db_session):
     job = Job(
         input_type="raw_text",

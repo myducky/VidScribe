@@ -34,11 +34,23 @@ def process_job(job_id: str) -> dict:
                 desired_length=request.desired_length,
                 language=request.language,
             )
+        elif job.input_type.value == "bilibili_url":
+            file_path_value = input_payload.get("file_path")
+            result = service.pipeline.run(
+                db,
+                job,
+                bilibili_url=input_payload["bilibili_url"],
+                raw_text=input_payload.get("raw_text"),
+                file_path=Path(file_path_value) if file_path_value else None,
+                desired_length=input_payload.get("desired_length", 1200),
+                language=input_payload.get("language", "zh"),
+            )
         elif job.input_type.value == "douyin_url":
             file_path_value = input_payload.get("file_path")
             result = service.pipeline.run(
                 db,
                 job,
+                bilibili_url=input_payload.get("bilibili_url"),
                 douyin_url=input_payload["douyin_url"],
                 raw_text=input_payload.get("raw_text"),
                 file_path=Path(file_path_value) if file_path_value else None,

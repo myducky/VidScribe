@@ -56,6 +56,45 @@ def test_pipeline_falls_back_to_raw_text_when_douyin_download_fails(db_session, 
     assert transcribe_step.status == StepStatus.SKIPPED
 
 
+def test_pipeline_falls_back_to_raw_text_when_bilibili_download_fails(db_session, monkeypatch):
+    settings = get_settings()
+    service = JobService(settings)
+    job = Job(
+        input_type=InputType.BILIBILI_URL,
+        status=JobStatus.PENDING,
+        input_payload={
+            "bilibili_url": "https://www.bilibili.com/video/BV1S5PrzZEzQ",
+            "raw_text": "这是一段可作为回退来源的文本内容，用于保证 B 站下载失败后仍能完成文章生成。" * 2,
+        },
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    monkeypatch.setattr(
+        service.pipeline.deps.video_downloader,
+        "download_bilibili_video",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("download failed")),
+    )
+
+    result = service.pipeline.run(
+        db_session,
+        job,
+        bilibili_url=job.input_payload["bilibili_url"],
+        raw_text=job.input_payload["raw_text"],
+    )
+
+    download_step = next(step for step in job.steps if step.step_name == "download_video_if_possible")
+    extract_step = next(step for step in job.steps if step.step_name == "extract_audio")
+    transcribe_step = next(step for step in job.steps if step.step_name == "transcribe_audio")
+
+    assert result.status == JobStatus.SUCCESS
+    assert result.source.transcript_raw == job.input_payload["raw_text"]
+    assert download_step.status == StepStatus.SKIPPED
+    assert extract_step.status == StepStatus.SKIPPED
+    assert transcribe_step.status == StepStatus.SKIPPED
+
+
 def test_pipeline_falls_back_to_raw_text_when_uploaded_video_processing_fails(db_session, monkeypatch, tmp_path):
     settings = get_settings()
     service = JobService(settings)
@@ -181,6 +220,55 @@ def test_pipeline_falls_back_to_uploaded_video_when_douyin_download_fails(db_ses
 
     assert result.status == JobStatus.SUCCESS
     assert result.source.transcript_raw == "这是视频回退后的转写文本。"
+    assert download_step.status == StepStatus.SKIPPED
+    assert extract_step.status == StepStatus.SUCCESS
+    assert transcribe_step.status == StepStatus.SUCCESS
+
+
+def test_pipeline_falls_back_to_uploaded_video_when_bilibili_download_fails(db_session, monkeypatch, tmp_path):
+    settings = get_settings()
+    service = JobService(settings)
+    video_path = tmp_path / "fallback.mp4"
+    audio_path = tmp_path / "fallback.wav"
+    video_path.write_bytes(b"video")
+    audio_path.write_bytes(b"audio")
+    job = Job(
+        input_type=InputType.BILIBILI_URL,
+        status=JobStatus.PENDING,
+        input_payload={
+            "bilibili_url": "https://www.bilibili.com/video/BV1S5PrzZEzQ",
+            "file_path": str(video_path),
+        },
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    monkeypatch.setattr(
+        service.pipeline.deps.video_downloader,
+        "download_bilibili_video",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("download failed")),
+    )
+    monkeypatch.setattr(service.pipeline.deps.audio_extractor, "extract", lambda *_args, **_kwargs: audio_path)
+    monkeypatch.setattr(
+        service.pipeline.deps.transcriber,
+        "transcribe",
+        lambda *_args, **_kwargs: ("这是 B 站视频回退后的转写文本。", "zh"),
+    )
+
+    result = service.pipeline.run(
+        db_session,
+        job,
+        bilibili_url=job.input_payload["bilibili_url"],
+        file_path=video_path,
+    )
+
+    download_step = next(step for step in job.steps if step.step_name == "download_video_if_possible")
+    extract_step = next(step for step in job.steps if step.step_name == "extract_audio")
+    transcribe_step = next(step for step in job.steps if step.step_name == "transcribe_audio")
+
+    assert result.status == JobStatus.SUCCESS
+    assert result.source.transcript_raw == "这是 B 站视频回退后的转写文本。"
     assert download_step.status == StepStatus.SKIPPED
     assert extract_step.status == StepStatus.SUCCESS
     assert transcribe_step.status == StepStatus.SUCCESS

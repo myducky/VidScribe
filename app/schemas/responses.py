@@ -21,5 +21,28 @@ class AnalyzeVideoResponse(JobResultSchema):
     pass
 
 
+class AnalyzeRemoteVideoResponse(JobResultSchema):
+    pass
+
+
 class JobDetailResponse(JobStatusResponse):
     pass
+
+
+class DouyinProbeResponse(BaseModel):
+    input_url: str
+    normalized_url: str
+    downloadable: bool
+    reason_code: str
+    detail: str
+    resolved_video_id: str | None = None
+
+
+class VideoProbeResponse(BaseModel):
+    platform: str
+    input_url: str
+    normalized_url: str
+    downloadable: bool
+    reason_code: str
+    detail: str
+    resolved_video_id: str | None = None

@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     whisper_model: str = Field(default="base", alias="WHISPER_MODEL")
     storage_dir: str = Field(default="storage", alias="STORAGE_DIR")
     max_upload_mb: int = Field(default=300, alias="MAX_UPLOAD_MB")
+    douyin_cookie_file: str | None = Field(default=None, alias="DOUYIN_COOKIE_FILE")
+    douyin_cookies_from_browser: str | None = Field(default=None, alias="DOUYIN_COOKIES_FROM_BROWSER")
 
     @property
     def storage_path(self) -> Path:

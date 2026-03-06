@@ -12,3 +12,8 @@ def test_analyze_text_request_validation():
 def test_create_job_request_requires_raw_text():
     with pytest.raises(ValidationError):
         CreateJobRequest(input_type="raw_text")
+
+
+def test_create_job_request_requires_bilibili_url():
+    with pytest.raises(ValidationError):
+        CreateJobRequest(input_type="bilibili_url")

@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class InputType(str, Enum):
+    BILIBILI_URL = "bilibili_url"
     DOUYIN_URL = "douyin_url"
     RAW_TEXT = "raw_text"
     UPLOADED_VIDEO = "uploaded_video"

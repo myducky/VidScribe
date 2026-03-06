@@ -91,6 +91,7 @@ class PipelineService:
         job: Job,
         *,
         raw_text: str | None = None,
+        bilibili_url: str | None = None,
         douyin_url: str | None = None,
         file_path: Path | None = None,
         desired_length: int = 1200,
@@ -109,25 +110,37 @@ class PipelineService:
 
         try:
             self._mark_step(db, job, "parse_input", StepStatus.RUNNING)
-            self.deps.input_resolver.resolve(job.input_type, raw_text=raw_text, douyin_url=douyin_url, file_path=file_path)
+            self.deps.input_resolver.resolve(
+                job.input_type,
+                raw_text=raw_text,
+                bilibili_url=bilibili_url,
+                douyin_url=douyin_url,
+                file_path=file_path,
+            )
             self._mark_step(db, job, "parse_input", StepStatus.SUCCESS)
 
             self._mark_step(db, job, "resolve_source", StepStatus.RUNNING)
             self._mark_step(db, job, "resolve_source", StepStatus.SUCCESS)
 
-            if job.input_type == InputType.DOUYIN_URL:
+            if job.input_type in {InputType.BILIBILI_URL, InputType.DOUYIN_URL}:
                 self._mark_step(db, job, "download_video_if_possible", StepStatus.RUNNING)
                 try:
-                    source_video = self.deps.video_downloader.download_douyin_video(
-                        douyin_url or "",
-                        self.settings.storage_path / job.id / "downloads",
-                    )
+                    if job.input_type == InputType.BILIBILI_URL:
+                        source_video = self.deps.video_downloader.download_bilibili_video(
+                            bilibili_url or "",
+                            self.settings.storage_path / job.id / "downloads",
+                        )
+                    else:
+                        source_video = self.deps.video_downloader.download_douyin_video(
+                            douyin_url or "",
+                            self.settings.storage_path / job.id / "downloads",
+                        )
                 except Exception as exc:
                     if not self._can_fallback_to_available_source(raw_text=raw_text, file_path=file_path):
                         raise
                     logger.warning(
-                        "Douyin download failed; continuing with fallback source",
-                        extra={"job_id": job.id, "error": str(exc)},
+                        "Remote video download failed; continuing with fallback source",
+                        extra={"job_id": job.id, "error": str(exc), "input_type": job.input_type.value},
                     )
                     self._mark_step(
                         db,

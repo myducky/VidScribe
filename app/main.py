@@ -25,7 +25,7 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 @app.get("/", include_in_schema=False, response_class=HTMLResponse)
 def home() -> str:
     return f"""<!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -144,30 +144,30 @@ def home() -> str:
     <main>
       <section class="hero">
         <span class="eyebrow">VidScribe API</span>
-        <h1>Turn text, video, or Douyin links into article-ready output.</h1>
+        <h1>把文本、视频或网页链接整理成可发布文章。</h1>
         <p class="lead">
-          This service exposes a FastAPI + Celery workflow for text analysis, video transcription,
-          and async job processing. Start with the API docs or hit the health checks below.
+          这是一个基于 FastAPI + Celery 的内容整理服务，支持文本分析、视频转写和异步任务。
+          如果你要用网页链接，优先推荐公开的 B 站视频链接；抖音链接只做尽力解析。
         </p>
         <div class="actions">
-          <a class="button primary" href="/docs">Open Swagger UI</a>
-          <a class="button secondary" href="/redoc">Open ReDoc</a>
-          <a class="button secondary" href="/health">Health</a>
-          <a class="button secondary" href="{settings.api_prefix}/health">Versioned Health</a>
+          <a class="button primary" href="/docs">打开 Swagger UI</a>
+          <a class="button secondary" href="/redoc">打开 ReDoc</a>
+          <a class="button secondary" href="/health">健康检查</a>
+          <a class="button secondary" href="{settings.api_prefix}/health">版本化健康检查</a>
         </div>
       </section>
       <section class="grid">
         <article class="card">
-          <h2>Core endpoints</h2>
-          <p>Use <code>POST {settings.api_prefix}/analyze-text</code>, <code>POST {settings.api_prefix}/analyze-video</code>, and <code>POST {settings.api_prefix}/jobs</code> for the main flows.</p>
+          <h2>核心接口</h2>
+          <p>主流程使用 <code>POST {settings.api_prefix}/analyze-text</code>、<code>POST {settings.api_prefix}/analyze-video</code>、<code>POST {settings.api_prefix}/analyze-remote-video</code> 和 <code>POST {settings.api_prefix}/jobs</code>。探测网页链接时使用 <code>POST {settings.api_prefix}/probe-video-url</code>。</p>
         </article>
         <article class="card">
-          <h2>Local development</h2>
-          <p>Run <code>docker compose up --build</code> for the full stack, or start FastAPI and the Celery worker separately for local iteration.</p>
+          <h2>本地开发</h2>
+          <p>执行 <code>docker compose up --build</code> 启动完整栈，或分别启动 FastAPI 和 Celery worker 进行本地调试。</p>
         </article>
         <article class="card">
-          <h2>Operational note</h2>
-          <p>Douyin parsing is best-effort only. Keep <code>raw_text</code> or uploaded video available as fallback input when possible.</p>
+          <h2>使用建议</h2>
+          <p>优先使用公开的 B 站视频链接。抖音解析成功率较低，建议同时准备 <code>raw_text</code> 或本地上传视频作为回退输入。</p>
         </article>
       </section>
     </main>
