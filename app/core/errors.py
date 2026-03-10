@@ -7,3 +7,11 @@ class DomainError(Exception):
 
 class InvalidMediaError(DomainError):
     """Raised when an uploaded file is not a valid or supported media input."""
+
+
+class EmptyTranscriptError(InvalidMediaError):
+    """Raised when transcription completes without producing usable text."""
+
+
+class LLMUnavailableError(DomainError):
+    """Raised when the configured LLM cannot serve requests."""

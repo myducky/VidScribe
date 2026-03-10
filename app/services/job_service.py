@@ -33,8 +33,8 @@ class JobService:
             audio_extractor=AudioExtractor(),
             transcriber=Transcriber(settings),
             transcript_cleaner=TranscriptCleaner(),
-            summarizer=Summarizer(llm_client),
-            article_writer=ArticleWriter(llm_client),
+            summarizer=Summarizer(llm_client, settings),
+            article_writer=ArticleWriter(llm_client, settings),
             cover_prompt_generator=CoverPromptGenerator(llm_client),
             result_exporter=ResultExporter(),
         )

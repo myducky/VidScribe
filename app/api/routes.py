@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
-from app.core.errors import InvalidMediaError
+from app.core.errors import DomainError, InvalidMediaError
 from app.core.logging import logger
 from app.models.job import Job
 from app.schemas.common import JobResultSchema, JobStatusResponse, JobStepSchema
@@ -37,6 +37,10 @@ router = APIRouter()
 
 def get_job_service(settings: Settings = Depends(get_settings)) -> JobService:
     return JobService(settings)
+
+
+def _domain_http_status(exc: DomainError) -> int:
+    return status.HTTP_503_SERVICE_UNAVAILABLE
 
 
 @router.get("/health", response_model=HealthResponse, tags=["system"])
@@ -106,7 +110,11 @@ def analyze_text(
     db: Session = Depends(get_db),
     service: JobService = Depends(get_job_service),
 ) -> AnalyzeTextResponse:
-    return AnalyzeTextResponse.model_validate(service.run_text_analysis(db, payload).model_dump(mode="json"))
+    try:
+        result = service.run_text_analysis(db, payload)
+    except DomainError as exc:
+        raise HTTPException(status_code=_domain_http_status(exc), detail=str(exc)) from exc
+    return AnalyzeTextResponse.model_validate(result.model_dump(mode="json"))
 
 
 @router.post("/analyze-remote-video", response_model=AnalyzeRemoteVideoResponse, tags=["analysis"])
@@ -117,8 +125,9 @@ def analyze_remote_video(
 ) -> AnalyzeRemoteVideoResponse:
     try:
         return service.run_remote_video_analysis(db, payload)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (ValueError, DomainError) as exc:
+        status_code = 422 if isinstance(exc, ValueError) else _domain_http_status(exc)
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
 @router.post("/probe-douyin", response_model=DouyinProbeResponse, tags=["analysis"])
@@ -173,6 +182,7 @@ async def analyze_video(
     )
     try:
         result = service.run_video_analysis(db, target_path)
-    except InvalidMediaError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    except DomainError as exc:
+        status_code = status.HTTP_422_UNPROCESSABLE_CONTENT if isinstance(exc, InvalidMediaError) else _domain_http_status(exc)
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return AnalyzeVideoResponse.model_validate(result.model_dump(mode="json"))

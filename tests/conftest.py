@@ -3,6 +3,8 @@ import os
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///./test_vidscribe.db"
 os.environ["CELERY_BROKER_URL"] = "memory://"
 os.environ["CELERY_RESULT_BACKEND"] = "cache+memory://"
+os.environ["OPENAI_API_KEY"] = ""
+os.environ["OPENAI_BASE_URL"] = ""
 
 import pytest
 from fastapi.testclient import TestClient

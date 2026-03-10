@@ -1,10 +1,16 @@
+import os
 from pathlib import Path
+import subprocess
 
 from app.core.config import get_settings
+from app.core.database import SessionLocal
 from app.core.errors import InvalidMediaError
 from app.core.enums import InputType, JobStatus
+from app.models.job import Job
 from app.schemas.common import CoverSchema, JobResultSchema, SourceSchema
+from app.services.audio_extractor import AudioExtractor, resolve_ffmpeg_executable
 from app.services.job_service import JobService
+from app.services.transcriber import Transcriber
 
 
 def _fake_video_result(file_path: Path) -> JobResultSchema:
@@ -55,6 +61,44 @@ def test_analyze_video_sanitizes_uploaded_filename(client, monkeypatch):
     assert captured_path.suffix == ".mp4"
 
 
+def test_analyze_video_runs_primary_pipeline_successfully(client, monkeypatch, tmp_path):
+    audio_path = tmp_path / "clip.mp3"
+    audio_path.write_bytes(b"audio")
+
+    monkeypatch.setattr(
+        "app.services.audio_extractor.AudioExtractor.extract",
+        lambda _self, _video_path, _output_dir: audio_path,
+    )
+    monkeypatch.setattr(
+        "app.services.transcriber.Transcriber.transcribe",
+        lambda _self, _audio_path: ("这是上传视频主链路里的转写文本。", "zh"),
+    )
+
+    response = client.post(
+        "/v1/analyze-video",
+        files={"file": ("clip.mp4", b"video-bytes", "video/mp4")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["input_type"] == "uploaded_video"
+    assert body["status"] == JobStatus.SUCCESS.value
+    assert body["source"]["transcript_raw"] == "这是上传视频主链路里的转写文本。"
+    assert body["article_markdown"].startswith("# ")
+
+    session = SessionLocal()
+    try:
+        job = session.query(Job).one()
+        steps = {step.step_name: step.status.value for step in job.steps}
+        assert job.status == JobStatus.SUCCESS
+        assert steps["extract_audio"] == "SUCCESS"
+        assert steps["transcribe_audio"] == "SUCCESS"
+        assert steps["persist_artifacts"] == "SUCCESS"
+        assert len(job.artifacts) == 2
+    finally:
+        session.close()
+
+
 def test_analyze_video_enforces_size_limit(client):
     settings = get_settings()
     original_limit = settings.max_upload_mb
@@ -84,6 +128,28 @@ def test_analyze_video_returns_422_for_invalid_media(client, monkeypatch):
 
     assert response.status_code == 422
     assert response.json() == {"detail": "Uploaded file is not a valid or supported video."}
+
+
+def test_analyze_video_returns_422_for_empty_transcript(client, monkeypatch, tmp_path):
+    audio_path = tmp_path / "clip.mp3"
+    audio_path.write_bytes(b"audio")
+
+    monkeypatch.setattr(
+        "app.services.audio_extractor.AudioExtractor.extract",
+        lambda _self, _video_path, _output_dir: audio_path,
+    )
+    monkeypatch.setattr(
+        "app.services.transcriber.Transcriber.transcribe",
+        lambda _self, _audio_path: ("", "zh"),
+    )
+
+    response = client.post(
+        "/v1/analyze-video",
+        files={"file": ("clip.mp4", b"video-bytes", "video/mp4")},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "No speech was transcribed from the video audio."}
 
 
 def test_analyze_remote_video_returns_result_for_bilibili_url(client, monkeypatch):
@@ -123,6 +189,38 @@ def test_analyze_remote_video_returns_result_for_bilibili_url(client, monkeypatc
     assert response.json()["job_id"] == "remote-job"
 
 
+def test_analyze_remote_video_runs_primary_pipeline_without_fallback(client, monkeypatch, tmp_path):
+    downloaded_video = tmp_path / "remote.mp4"
+    audio_path = tmp_path / "remote.mp3"
+    downloaded_video.write_bytes(b"video")
+    audio_path.write_bytes(b"audio")
+
+    monkeypatch.setattr(
+        "app.services.video_downloader.VideoDownloader.download_bilibili_video",
+        lambda _self, _url, _output_dir: downloaded_video,
+    )
+    monkeypatch.setattr(
+        "app.services.audio_extractor.AudioExtractor.extract",
+        lambda _self, _video_path, _output_dir: audio_path,
+    )
+    monkeypatch.setattr(
+        "app.services.transcriber.Transcriber.transcribe",
+        lambda _self, _audio_path: ("这是远程视频主链路里的转写文本。", "zh"),
+    )
+
+    response = client.post(
+        "/v1/analyze-remote-video",
+        json={"video_url": "https://www.bilibili.com/video/BV1S5PrzZEzQ"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["input_type"] == "bilibili_url"
+    assert body["status"] == JobStatus.SUCCESS.value
+    assert body["source"]["transcript_raw"] == "这是远程视频主链路里的转写文本。"
+    assert body["article_markdown"].startswith("# ")
+
+
 def test_analyze_remote_video_returns_422_for_unsupported_platform(client, monkeypatch):
     def fake_run_remote_video_analysis(_self: JobService, _db, _payload) -> JobResultSchema:
         raise ValueError("Unsupported remote video URL. Use a public Bilibili link, or upload the video directly.")
@@ -138,3 +236,62 @@ def test_analyze_remote_video_returns_422_for_unsupported_platform(client, monke
     assert response.json() == {
         "detail": "Unsupported remote video URL. Use a public Bilibili link, or upload the video directly."
     }
+
+
+def test_audio_extractor_falls_back_to_imageio_ffmpeg_binary(monkeypatch, tmp_path):
+    extractor = AudioExtractor()
+    video_path = tmp_path / "clip.mp4"
+    video_path.write_bytes(b"video")
+    output_dir = tmp_path / "audio"
+
+    resolve_ffmpeg_executable.cache_clear()
+    monkeypatch.setattr("app.services.audio_extractor.which", lambda _name: None)
+    monkeypatch.setattr(
+        "imageio_ffmpeg.get_ffmpeg_exe",
+        lambda: "/tmp/fake-ffmpeg",
+    )
+
+    captured_command: list[str] = []
+
+    def fake_run(command: list[str], capture_output: bool, text: bool, check: bool) -> subprocess.CompletedProcess[str]:
+        nonlocal captured_command
+        captured_command = command
+        return subprocess.CompletedProcess(command, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("app.services.audio_extractor.subprocess.run", fake_run)
+
+    audio_path = extractor.extract(video_path, output_dir)
+
+    assert captured_command[0] == "/tmp/fake-ffmpeg"
+    assert audio_path == output_dir / "clip.mp3"
+    resolve_ffmpeg_executable.cache_clear()
+
+
+def test_transcriber_exposes_ffmpeg_alias_on_path(monkeypatch, tmp_path):
+    settings = get_settings()
+    original_storage_dir = settings.storage_dir
+    original_path = os.environ.get("PATH", "")
+    settings.storage_dir = str(tmp_path)
+
+    try:
+        resolve_ffmpeg_executable.cache_clear()
+        monkeypatch.setattr(
+            "app.services.audio_extractor.resolve_ffmpeg_executable",
+            lambda: "/tmp/fake-ffmpeg-bin",
+        )
+        monkeypatch.setattr(
+            "app.services.transcriber.resolve_ffmpeg_executable",
+            lambda: "/tmp/fake-ffmpeg-bin",
+        )
+
+        transcriber = Transcriber(settings)
+        transcriber._ensure_ffmpeg_on_path()
+
+        ffmpeg_link = tmp_path / ".runtime-bin" / "ffmpeg"
+        assert ffmpeg_link.is_symlink()
+        assert os.readlink(ffmpeg_link) == "/tmp/fake-ffmpeg-bin"
+        assert str(tmp_path / ".runtime-bin") in os.environ["PATH"].split(os.pathsep)
+    finally:
+        settings.storage_dir = original_storage_dir
+        os.environ["PATH"] = original_path
+        resolve_ffmpeg_executable.cache_clear()

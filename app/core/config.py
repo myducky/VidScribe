@@ -33,12 +33,17 @@ class Settings(BaseSettings):
     max_upload_mb: int = Field(default=300, alias="MAX_UPLOAD_MB")
     douyin_cookie_file: str | None = Field(default=None, alias="DOUYIN_COOKIE_FILE")
     douyin_cookies_from_browser: str | None = Field(default=None, alias="DOUYIN_COOKIES_FROM_BROWSER")
+    writing_style_file: str = Field(default="app/prompts/writing_style.md", alias="WRITING_STYLE_FILE")
 
     @property
     def storage_path(self) -> Path:
         path = Path(self.storage_dir)
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    @property
+    def writing_style_path(self) -> Path:
+        return Path(self.writing_style_file)
 
 
 @lru_cache

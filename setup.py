@@ -5,4 +5,5 @@ setup(
     name="vidscribe",
     version="0.1.0",
     packages=find_packages(include=["app", "app.*"]),
+    include_package_data=True,
 )

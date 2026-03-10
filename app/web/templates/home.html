@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VidScribe API</title>
+    <link rel="stylesheet" href="/static/home.css">
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <span class="eyebrow">VidScribe Studio</span>
+            <h1>把视频内容，整理成可以直接发的中文成稿。</h1>
+            <p class="lead">
+              这是一个免登录的 C 端工作台。你可以直接粘贴文本、上传视频、探测远程链接，或提交异步任务并跟踪每一步状态。
+            </p>
+            <div class="actions">
+              <a class="button primary" href="#workspace">直接开始</a>
+              <a class="button secondary" href="/docs">Swagger</a>
+              <a class="button secondary" href="/redoc">ReDoc</a>
+              <a class="button secondary" href="/health">健康检查</a>
+            </div>
+            <div class="stats">
+              <div class="stat">
+                <strong>4 条输入链路</strong>
+                <span>文本、远程链接、本地上传、异步任务</span>
+              </div>
+              <div class="stat">
+                <strong>1 个结果中心</strong>
+                <span>标题、摘要、提纲、正文、封面、来源一次返回</span>
+              </div>
+              <div class="stat">
+                <strong>0 登录门槛</strong>
+                <span>打开即可试，浏览器本地保留最近结果和草稿</span>
+              </div>
+            </div>
+          </div>
+
+          <aside class="hero-side">
+            <article class="tip-card">
+              <h2>推荐使用方式</h2>
+              <ul class="tips">
+                <li>优先用公开 B 站链接，稳定性最好。</li>
+                <li>抖音只做尽力解析，建议同时准备回退文本。</li>
+                <li>长任务切到异步模式，避免同步等待过久。</li>
+                <li>结果支持复制 Markdown 和下载 JSON。</li>
+              </ul>
+            </article>
+            <article class="tip-card compact">
+              <div>
+                <strong>Base URL</strong>
+                <span class="mono">__API_PREFIX__</span>
+              </div>
+              <div>
+                <strong>当前模式</strong>
+                <span>免登录直接使用</span>
+              </div>
+            </article>
+          </aside>
+        </div>
+      </section>
+
+      <section id="workspace" class="workspace">
+        <section class="panel composer-panel">
+          <div class="panel-head">
+            <div>
+              <h2>内容工作台</h2>
+              <p>先选输入方式，再直接发起分析。常用样例、草稿和最近记录都在这一侧。</p>
+            </div>
+            <span class="badge">免登录体验</span>
+          </div>
+
+          <div class="quick-strip">
+            <button id="fill-text-demo" class="secondary" type="button">填充文本示例</button>
+            <button id="fill-bilibili-demo" class="secondary" type="button">填充 B 站示例</button>
+            <button id="fill-job-demo" class="secondary" type="button">填充异步示例</button>
+            <button id="save-draft" class="secondary" type="button">保存当前草稿</button>
+          </div>
+
+          <div class="tabs">
+            <button class="tab active" type="button" data-view-target="text-view">文本分析</button>
+            <button class="tab" type="button" data-view-target="remote-view">远程链接</button>
+            <button class="tab" type="button" data-view-target="upload-view">本地视频</button>
+            <button class="tab" type="button" data-view-target="job-view">异步任务</button>
+          </div>
+
+          <div id="text-view" class="view active">
+            <div class="field">
+              <label for="raw-text">原始文本</label>
+              <textarea id="raw-text" placeholder="粘贴字幕、口播稿、访谈纪要或脚本，至少 20 个字符。"></textarea>
+              <p>直接调用 <code>POST __API_PREFIX__/analyze-text</code>。</p>
+            </div>
+            <div class="inline">
+              <div class="field">
+                <label for="text-length">目标长度</label>
+                <input id="text-length" type="number" min="800" max="1800" value="1200">
+              </div>
+              <div class="field">
+                <label for="text-language">语言</label>
+                <input id="text-language" type="text" value="zh">
+              </div>
+            </div>
+            <div class="toolbar">
+              <button id="run-text" class="primary" type="button">分析文本</button>
+            </div>
+          </div>
+
+          <div id="remote-view" class="view">
+            <div class="field">
+              <label for="remote-url">视频链接</label>
+              <input id="remote-url" type="url" placeholder="推荐公开 B 站链接，也可尝试抖音链接。">
+              <p>建议先探测，再决定是否继续同步分析。</p>
+            </div>
+            <div class="field">
+              <label for="remote-fallback">回退文本（可选）</label>
+              <textarea id="remote-fallback" placeholder="下载失败时，用这段文本继续完成内容整理。"></textarea>
+            </div>
+            <div class="inline">
+              <div class="field">
+                <label for="remote-length">目标长度</label>
+                <input id="remote-length" type="number" min="800" max="1800" value="1200">
+              </div>
+              <div class="field">
+                <label for="remote-language">语言</label>
+                <input id="remote-language" type="text" value="zh">
+              </div>
+            </div>
+            <div class="toolbar">
+              <button id="probe-remote" class="secondary" type="button">先探测链接</button>
+              <button id="run-remote" class="primary" type="button">同步分析远程视频</button>
+            </div>
+            <div id="probe-result" class="result-block hidden">
+              <div class="result-block-head">
+                <h3>探测结果</h3>
+                <span class="badge subtle">probe-video-url</span>
+              </div>
+              <pre id="probe-result-content"></pre>
+            </div>
+          </div>
+
+          <div id="upload-view" class="view">
+            <div class="field">
+              <label for="video-file">上传视频</label>
+              <input id="video-file" type="file" accept="video/*">
+              <p>直接调用 <code>POST __API_PREFIX__/analyze-video</code>。文件会先进入服务端上传目录，再转写与整理。</p>
+            </div>
+            <div class="toolbar">
+              <button id="run-upload" class="primary" type="button">上传并分析</button>
+            </div>
+          </div>
+
+          <div id="job-view" class="view">
+            <div class="inline">
+              <div class="field">
+                <label for="job-type">任务输入类型</label>
+                <select id="job-type">
+                  <option value="raw_text">raw_text</option>
+                  <option value="bilibili_url">bilibili_url</option>
+                  <option value="douyin_url">douyin_url</option>
+                  <option value="uploaded_video">uploaded_video</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="job-length">目标长度</label>
+                <input id="job-length" type="number" min="800" max="1800" value="1200">
+              </div>
+              <div class="field">
+                <label for="job-language">语言</label>
+                <input id="job-language" type="text" value="zh">
+              </div>
+            </div>
+            <div class="field job-field" data-job-field="raw_text">
+              <label for="job-raw-text">任务文本</label>
+              <textarea id="job-raw-text" placeholder="异步任务使用的原始文本。"></textarea>
+            </div>
+            <div class="field job-field hidden" data-job-field="bilibili_url">
+              <label for="job-bilibili-url">B 站链接</label>
+              <input id="job-bilibili-url" type="url" placeholder="https://www.bilibili.com/video/...">
+            </div>
+            <div class="field job-field hidden" data-job-field="douyin_url">
+              <label for="job-douyin-url">抖音链接</label>
+              <input id="job-douyin-url" type="url" placeholder="https://www.douyin.com/video/...">
+            </div>
+            <div class="field job-field hidden" data-job-field="uploaded_video">
+              <label for="job-uploaded-video-path">已上传文件名</label>
+              <input id="job-uploaded-video-path" type="text" placeholder="例如 example.mp4，只接受 storage/uploads 内的文件名。">
+            </div>
+            <div class="field">
+              <label for="job-fallback">任务回退文本（可选）</label>
+              <textarea id="job-fallback" placeholder="B 站或抖音任务建议准备回退文本，提升成功率。"></textarea>
+            </div>
+            <div class="helper-grid">
+              <button id="create-job" class="primary" type="button">提交异步任务</button>
+              <button id="refresh-job" class="secondary" type="button">查询任务状态</button>
+              <button id="poll-job" class="secondary" type="button">自动轮询结果</button>
+            </div>
+            <div class="field">
+              <label for="job-id-input">任务 ID</label>
+              <input id="job-id-input" type="text" placeholder="提交成功后会自动填充，也可粘贴已有 job_id。">
+            </div>
+          </div>
+
+          <div id="global-status" class="status-line">
+            <span class="badge">实时状态</span>
+            <span id="status-text" class="status-text">等待操作。</span>
+          </div>
+
+          <div class="history-grid">
+            <article class="history-card">
+              <div class="result-block-head">
+                <h3>最近记录</h3>
+                <button id="clear-history" class="ghost" type="button">清空</button>
+              </div>
+              <div id="history-list" class="history-list">
+                <p class="empty-card">还没有最近记录。</p>
+              </div>
+            </article>
+            <article class="history-card">
+              <div class="result-block-head">
+                <h3>本地草稿</h3>
+                <button id="clear-drafts" class="ghost" type="button">清空</button>
+              </div>
+              <div id="draft-list" class="history-list">
+                <p class="empty-card">还没有保存草稿。</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel result-panel">
+          <div class="panel-head">
+            <div>
+              <h2>结果中心</h2>
+              <p>这里会统一展示同步分析结果或异步任务结果，并提供复制、下载和本地保存操作。</p>
+            </div>
+            <span id="result-status-badge" class="badge subtle">等待结果</span>
+          </div>
+
+          <div class="result-actions">
+            <button id="copy-markdown" class="secondary" type="button">复制 Markdown</button>
+            <button id="download-markdown" class="secondary" type="button">下载 Markdown</button>
+            <button id="download-json" class="secondary" type="button">下载 JSON</button>
+            <button id="save-result" class="secondary" type="button">保存到最近记录</button>
+            <button id="clear-result" class="ghost" type="button">清空结果</button>
+          </div>
+
+          <div class="result-reading-layout">
+            <div class="result-main-column">
+              <div class="overview-grid overview-grid-reading">
+                <article class="overview-card">
+                  <span>输入类型</span>
+                  <strong id="overview-input-type">暂无</strong>
+                </article>
+                <article class="overview-card">
+                  <span>任务状态</span>
+                  <strong id="overview-status">等待中</strong>
+                </article>
+                <article class="overview-card">
+                  <span>语言</span>
+                  <strong id="overview-language">zh</strong>
+                </article>
+                <article class="overview-card">
+                  <span>时长 / 秒</span>
+                  <strong id="overview-duration">0</strong>
+                </article>
+              </div>
+
+              <article class="result-card article-card article-card-featured">
+                <div class="result-block-head">
+                  <div>
+                    <h3>文章 Markdown</h3>
+                    <p class="result-hint">主阅读区。长内容优先在这里看，复制和下载操作保留在上方。</p>
+                  </div>
+                  <span class="badge subtle">适合直接复制或下载</span>
+                </div>
+                <pre id="result-article" class="article-output">暂无</pre>
+              </article>
+
+              <article class="status-card step-card">
+                <div class="result-block-head">
+                  <h3>异步任务步骤</h3>
+                  <span class="badge subtle">jobs pipeline</span>
+                </div>
+                <div id="job-steps" class="step-list">
+                  <div class="step"><strong>暂无任务</strong><small>提交异步任务后，这里会显示 step_name、状态和错误信息。</small></div>
+                </div>
+              </article>
+            </div>
+
+            <aside class="result-side-column">
+              <article class="result-card result-card-emphasis">
+                <h3>摘要</h3>
+                <pre id="result-summary" class="meta-text reading-text">暂无</pre>
+              </article>
+              <article class="result-card">
+                <h3>标题候选</h3>
+                <ul id="result-titles" class="list"><li class="empty">暂无</li></ul>
+              </article>
+              <article class="result-card">
+                <h3>提纲</h3>
+                <ul id="result-outline" class="list"><li class="empty">暂无</li></ul>
+              </article>
+              <article class="result-card">
+                <h3>亮点</h3>
+                <ul id="result-highlights" class="list"><li class="empty">暂无</li></ul>
+              </article>
+              <article class="result-card">
+                <h3>标签</h3>
+                <ul id="result-tags" class="list"><li class="empty">暂无</li></ul>
+              </article>
+              <article class="result-card">
+                <h3>封面建议</h3>
+                <pre id="result-cover" class="meta-text">暂无</pre>
+              </article>
+              <article class="result-card">
+                <h3>基础信息</h3>
+                <pre id="result-meta" class="meta-text">尚未返回结果。</pre>
+              </article>
+              <article class="result-card">
+                <h3>来源文本</h3>
+                <pre id="result-source" class="meta-text source-output">暂无</pre>
+              </article>
+            </aside>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script>
+      window.__VIDSCRIBE_CONFIG__ = { apiPrefix: "__API_PREFIX__" };
+    </script>
+    <script src="/static/home.js"></script>
+  </body>
+</html>

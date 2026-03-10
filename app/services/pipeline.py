@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.core.errors import EmptyTranscriptError
 from app.core.enums import InputType, JobStatus, StepStatus
 from app.core.logging import logger
 from app.models.job import Artifact, Job, JobStep
@@ -192,6 +193,8 @@ class PipelineService:
                     self._mark_step(db, job, "transcribe_audio", StepStatus.RUNNING)
                     try:
                         transcript_raw, source_language = self.deps.transcriber.transcribe(audio_path)
+                        if not transcript_raw.strip():
+                            raise EmptyTranscriptError("No speech was transcribed from the video audio.")
                     except Exception as exc:
                         if raw_text:
                             logger.warning(
@@ -214,6 +217,8 @@ class PipelineService:
 
             self._mark_step(db, job, "clean_transcript", StepStatus.RUNNING)
             transcript_clean = self.deps.transcript_cleaner.clean(transcript_raw)
+            if not transcript_clean:
+                raise EmptyTranscriptError("No usable transcript content was produced from the input.")
             self._mark_step(db, job, "clean_transcript", StepStatus.SUCCESS)
 
             self._mark_step(db, job, "summarize_content", StepStatus.RUNNING)

@@ -1,4 +1,5 @@
 from app.core.config import get_settings
+from app.core.errors import EmptyTranscriptError
 from app.core.enums import InputType, JobStatus, StepStatus
 from app.models.job import Job
 from app.services.job_service import JobService
@@ -174,6 +175,42 @@ def test_pipeline_falls_back_to_raw_text_when_transcription_fails(db_session, mo
     assert result.source.transcript_raw == job.input_payload["raw_text"]
     assert extract_step.status == StepStatus.SUCCESS
     assert transcribe_step.status == StepStatus.SKIPPED
+
+
+def test_pipeline_fails_when_transcription_returns_empty_without_fallback(db_session, monkeypatch, tmp_path):
+    settings = get_settings()
+    service = JobService(settings)
+    video_path = tmp_path / "clip.mp4"
+    audio_path = tmp_path / "clip.wav"
+    video_path.write_bytes(b"video")
+    audio_path.write_bytes(b"audio")
+    job = Job(
+        input_type=InputType.UPLOADED_VIDEO,
+        status=JobStatus.PENDING,
+        input_payload={"file_path": str(video_path)},
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    monkeypatch.setattr(service.pipeline.deps.audio_extractor, "extract", lambda *_args, **_kwargs: audio_path)
+    monkeypatch.setattr(service.pipeline.deps.transcriber, "transcribe", lambda *_args, **_kwargs: ("   ", "zh"))
+
+    try:
+        service.pipeline.run(
+            db_session,
+            job,
+            file_path=video_path,
+        )
+    except EmptyTranscriptError as exc:
+        assert str(exc) == "No speech was transcribed from the video audio."
+    else:
+        raise AssertionError("Expected EmptyTranscriptError for empty transcription output")
+
+    db_session.refresh(job)
+    transcribe_step = next(step for step in job.steps if step.step_name == "transcribe_audio")
+    assert job.status == JobStatus.FAILED
+    assert transcribe_step.status == StepStatus.FAILED
 
 
 def test_pipeline_falls_back_to_uploaded_video_when_douyin_download_fails(db_session, monkeypatch, tmp_path):

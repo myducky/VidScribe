@@ -69,6 +69,7 @@ OPENAI_TIMEOUT_SEC=60
 WHISPER_MODEL=base
 STORAGE_DIR=storage
 MAX_UPLOAD_MB=300
+WRITING_STYLE_FILE=app/prompts/writing_style.md
 
 DOUYIN_COOKIE_FILE=
 DOUYIN_COOKIES_FROM_BROWSER=
@@ -78,6 +79,8 @@ DOUYIN_COOKIES_FROM_BROWSER=
 - 如果没有配置 OpenAI 兼容接口，系统会退回本地确定性生成逻辑，方便开发联调
 - 当抖音要求新鲜 cookies 时，可以配置 `DOUYIN_COOKIE_FILE` 或 `DOUYIN_COOKIES_FROM_BROWSER`
 - 两者同时设置时，优先使用 `DOUYIN_COOKIE_FILE`
+- 可以运行 `python scripts/check_llm.py` 检查当前是否真的启用了真实模型
+- 可以直接编辑 `app/prompts/writing_style.md` 调整写作人格和文风，无需修改 Python 代码
 
 ## 启动方式
 

@@ -173,6 +173,14 @@ def test_video_downloader_includes_cookie_file_option():
     assert "cookiesfrombrowser" not in options
 
 
+def test_video_downloader_uses_merged_audio_video_format_for_download(tmp_path):
+    options = VideoDownloader()._build_options(download=True, output_dir=tmp_path)
+
+    assert options["format"] == "bv*+ba/b"
+    assert options["merge_output_format"] == "mp4"
+    assert options["outtmpl"] == str(tmp_path / "%(id)s.%(ext)s")
+
+
 def test_video_downloader_includes_browser_cookie_option():
     settings = Settings(DOUYIN_COOKIES_FROM_BROWSER="chrome")
 
@@ -183,9 +191,11 @@ def test_video_downloader_includes_browser_cookie_option():
 
 
 def test_download_douyin_video_uses_normalized_video_url(monkeypatch, tmp_path):
+    captured_options: dict = {}
+
     class FakeYoutubeDL:
         def __init__(self, options):
-            self.options = options
+            captured_options.update(options)
             self.seen_url: str | None = None
 
         def __enter__(self):
@@ -202,13 +212,22 @@ def test_download_douyin_video_uses_normalized_video_url(monkeypatch, tmp_path):
         def prepare_filename(self, _info):
             return str(tmp_path / "7602192686975601972.mp4")
 
-    fake_ydl = FakeYoutubeDL({})
-    monkeypatch.setattr("app.services.video_downloader.yt_dlp.YoutubeDL", lambda options: fake_ydl)
+    fake_ydl: FakeYoutubeDL | None = None
+
+    def fake_factory(options):
+        nonlocal fake_ydl
+        fake_ydl = FakeYoutubeDL(options)
+        return fake_ydl
+
+    monkeypatch.setattr("app.services.video_downloader.yt_dlp.YoutubeDL", fake_factory)
 
     downloaded = VideoDownloader().download_douyin_video(
         "https://www.douyin.com/jingxuan?modal_id=7602192686975601972",
         tmp_path,
     )
 
+    assert captured_options["format"] == "bv*+ba/b"
+    assert captured_options["merge_output_format"] == "mp4"
+    assert fake_ydl is not None
     assert fake_ydl.seen_url == "https://www.douyin.com/video/7602192686975601972"
     assert downloaded.name == "7602192686975601972.mp4"

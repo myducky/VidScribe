@@ -179,3 +179,44 @@ def test_get_job_detail_and_result(client, db_session):
     assert result_response.status_code == 200
     assert result_response.json()["job_id"] == "result-job"
     assert result_response.json()["source"]["transcript_clean"] == "清洗文本"
+
+
+def test_create_job_can_complete_full_async_pipeline(client, monkeypatch):
+    queued_job_ids: list[str] = []
+
+    def fake_delay(job_id: str) -> object:
+        queued_job_ids.append(job_id)
+        return object()
+
+    monkeypatch.setattr(process_job, "delay", fake_delay)
+
+    create_response = client.post(
+        "/v1/jobs",
+        json={
+            "input_type": "raw_text",
+            "raw_text": "这是一段用于验证异步任务主链路的文本内容，会经过创建任务、执行 pipeline、查询详情和拉取结果的完整流程。" * 2,
+        },
+    )
+
+    assert create_response.status_code == 202
+    job_id = create_response.json()["job_id"]
+    assert queued_job_ids == [job_id]
+
+    process_job(job_id)
+
+    detail_response = client.get(f"/v1/jobs/{job_id}")
+    result_response = client.get(f"/v1/jobs/{job_id}/result")
+
+    assert detail_response.status_code == 200
+    assert result_response.status_code == 200
+    assert detail_response.json()["status"] == JobStatus.SUCCESS.value
+    assert result_response.json()["job_id"] == job_id
+    assert result_response.json()["input_type"] == "raw_text"
+    assert result_response.json()["article_markdown"].startswith("# ")
+
+    steps = {step["step_name"]: step["status"] for step in detail_response.json()["steps"]}
+    assert steps["parse_input"] == "SUCCESS"
+    assert steps["clean_transcript"] == "SUCCESS"
+    assert steps["summarize_content"] == "SUCCESS"
+    assert steps["generate_article"] == "SUCCESS"
+    assert steps["persist_artifacts"] == "SUCCESS"

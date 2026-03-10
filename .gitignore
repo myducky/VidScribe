@@ -50,7 +50,14 @@ cover/
 
 # Local environments and secrets
 .env
+.env.*
+!.env.example
 .envrc
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
 .venv/
 .localpython311/
 .tools/
@@ -64,6 +71,9 @@ venv.bak/
 *.db
 storage/
 instance/
+tmp_e2e/
+tmp_e2e_fix/
+tmp_http_e2e/
 
 # Project/tool caches
 .mypy_cache/

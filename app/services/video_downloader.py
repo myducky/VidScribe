@@ -146,11 +146,12 @@ class VideoDownloader:
         options = {
             "quiet": True,
             "noplaylist": True,
-            "format": "mp4/best",
         }
         if download:
             if output_dir is None:
                 raise ValueError("output_dir is required when download=True")
+            options["format"] = "bv*+ba/b"
+            options["merge_output_format"] = "mp4"
             options["outtmpl"] = str(output_dir / "%(id)s.%(ext)s")
         else:
             options["skip_download"] = True
