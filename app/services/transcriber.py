@@ -42,5 +42,8 @@ class Transcriber:
     def transcribe(self, audio_path: Path) -> tuple[str, str]:
         self._ensure_ffmpeg_on_path()
         model = self._load_model()
-        result = model.transcribe(str(audio_path))
+        transcribe_options: dict[str, str] = {}
+        if self.settings.whisper_initial_prompt:
+            transcribe_options["initial_prompt"] = self.settings.whisper_initial_prompt
+        result = model.transcribe(str(audio_path), **transcribe_options)
         return result.get("text", "").strip(), result.get("language", "zh")

@@ -15,3 +15,7 @@ class EmptyTranscriptError(InvalidMediaError):
 
 class LLMUnavailableError(DomainError):
     """Raised when the configured LLM cannot serve requests."""
+
+
+class RemoteVideoDownloadError(DomainError):
+    """Raised when a remote video cannot be downloaded and no fallback input is available."""

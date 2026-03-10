@@ -15,7 +15,7 @@ def test_home(client):
     assert "/static/home.css" in response.text
     assert "/static/home.js" in response.text
     assert "最近记录" in response.text
-    assert "复制 Markdown" in response.text
+    assert "复制 HTML" in response.text
 
 
 def test_health_versioned(client):

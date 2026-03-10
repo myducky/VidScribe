@@ -11,6 +11,19 @@ const state = {
   toastTimer: null,
 };
 
+const STEP_LABELS = {
+  parse_input: "正在解析输入",
+  resolve_source: "正在确认素材来源",
+  download_video_if_possible: "正在下载远程视频",
+  extract_audio: "正在提取音频",
+  transcribe_audio: "正在转写音频",
+  clean_transcript: "正在清洗文本",
+  summarize_content: "正在提炼摘要",
+  generate_article: "正在生成文章",
+  generate_cover_prompt: "正在生成封面提示词",
+  persist_artifacts: "正在保存结果文件",
+};
+
 const statusText = document.getElementById("status-text");
 const toast = document.getElementById("toast");
 const probeCard = document.getElementById("probe-result");
@@ -34,6 +47,9 @@ const overviewInputType = document.getElementById("overview-input-type");
 const overviewStatus = document.getElementById("overview-status");
 const overviewLanguage = document.getElementById("overview-language");
 const overviewDuration = document.getElementById("overview-duration");
+const openJobLocationButton = document.getElementById("open-job-location");
+const deleteJobMediaButton = document.getElementById("delete-job-media");
+const deleteJobFilesButton = document.getElementById("delete-job-files");
 
 function getLocalArray(key) {
   try {
@@ -50,6 +66,36 @@ function setLocalArray(key, value) {
 function setStatus(message, tone = "") {
   statusText.textContent = message;
   statusText.className = tone ? `status-text ${tone}` : "status-text";
+}
+
+function formatStepLabel(stepName) {
+  return STEP_LABELS[stepName] || `正在执行 ${stepName}`;
+}
+
+function updateStatusFromJobDetail(payload) {
+  if (!payload?.steps?.length) {
+    return;
+  }
+
+  const runningStep = payload.steps.find((step) => step.status === "RUNNING");
+  if (runningStep) {
+    setStatus(`${formatStepLabel(runningStep.step_name)}…`);
+    return;
+  }
+
+  if (payload.status === "FAILED") {
+    const failedStep = [...payload.steps].reverse().find((step) => step.status === "FAILED");
+    if (failedStep) {
+      setStatus(`${formatStepLabel(failedStep.step_name)}失败：${failedStep.error_message || "请查看步骤详情。"}`, "error");
+      return;
+    }
+  }
+
+  if (payload.status === "SUCCESS") {
+    setStatus("任务已完成，结果已加载。", "success");
+  } else if (payload.status === "PENDING") {
+    setStatus("任务已提交，等待开始。");
+  }
 }
 
 function showToast(message) {
@@ -75,6 +121,50 @@ function renderList(target, values) {
 
 function renderPre(target, payload) {
   target.textContent = payload || "暂无";
+}
+
+function sanitizeArticleHtml(html) {
+  const allowedTags = new Set(["H1", "H2", "H3", "P", "UL", "OL", "LI", "STRONG", "EM", "BLOCKQUOTE", "BR"]);
+  const template = document.createElement("template");
+  template.innerHTML = html || "";
+
+  const sanitizeNode = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.textContent || "");
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return document.createDocumentFragment();
+    }
+
+    if (!allowedTags.has(node.tagName)) {
+      const fragment = document.createDocumentFragment();
+      Array.from(node.childNodes).forEach((child) => {
+        fragment.appendChild(sanitizeNode(child));
+      });
+      return fragment;
+    }
+
+    const element = document.createElement(node.tagName.toLowerCase());
+    Array.from(node.childNodes).forEach((child) => {
+      element.appendChild(sanitizeNode(child));
+    });
+    return element;
+  };
+
+  const fragment = document.createDocumentFragment();
+  Array.from(template.content.childNodes).forEach((node) => {
+    fragment.appendChild(sanitizeNode(node));
+  });
+  return fragment;
+}
+
+function renderArticleHtml(html) {
+  resultArticle.replaceChildren();
+  if (!html) {
+    resultArticle.textContent = "暂无";
+    return;
+  }
+  resultArticle.appendChild(sanitizeArticleHtml(html));
 }
 
 function updateOverview(payload) {
@@ -104,9 +194,10 @@ function renderResult(payload) {
   renderList(resultOutline, payload.outline);
   renderList(resultHighlights, payload.highlights);
   renderList(resultTags, payload.tags);
-  renderPre(resultArticle, payload.article_markdown);
+  renderArticleHtml(payload.article_html);
   renderPre(resultCover, JSON.stringify(payload.cover ?? {}, null, 2));
   renderPre(resultSource, JSON.stringify(payload.source ?? {}, null, 2));
+  syncJobArtifactButtons();
 }
 
 function clearResultView() {
@@ -117,18 +208,20 @@ function clearResultView() {
   renderPre(resultSummary, "暂无");
   renderPre(resultCover, "暂无");
   renderPre(resultSource, "暂无");
-  renderPre(resultArticle, "暂无");
+  renderArticleHtml("");
   renderList(resultTitles, []);
   renderList(resultOutline, []);
   renderList(resultHighlights, []);
   renderList(resultTags, []);
   renderSteps(null);
+  syncJobArtifactButtons();
 }
 
 function renderSteps(payload) {
   state.currentJobDetail = payload;
   if (!payload?.steps?.length) {
     jobSteps.innerHTML = '<div class="step"><strong>暂无任务</strong><small>提交异步任务后，这里会显示 step_name、状态和错误信息。</small></div>';
+    syncJobArtifactButtons();
     return;
   }
   jobSteps.innerHTML = payload.steps
@@ -150,6 +243,42 @@ function renderSteps(payload) {
       `;
     })
     .join("");
+  updateStatusFromJobDetail(payload);
+  syncJobArtifactButtons();
+}
+
+function getActiveJobId() {
+  return state.currentResult?.job_id || state.currentJobDetail?.job_id || jobIdInput.value.trim() || "";
+}
+
+function syncJobArtifactButtons() {
+  const hasJobId = Boolean(getActiveJobId());
+  openJobLocationButton.disabled = !hasJobId;
+  deleteJobMediaButton.disabled = !hasJobId;
+  deleteJobFilesButton.disabled = !hasJobId;
+}
+
+async function fetchJobLocation(jobId) {
+  return requestJson(`${API_PREFIX}/jobs/${jobId}/artifacts/location`);
+}
+
+async function openJobLocation(jobId = getActiveJobId()) {
+  if (!jobId) {
+    throw new Error("当前没有可查看资源的 job_id。");
+  }
+
+  setStatus("正在获取任务资源位置…");
+  const location = await fetchJobLocation(jobId);
+  const opened = window.open(location.job_dir_url, "_blank", "noopener");
+  if (opened) {
+    setStatus("已尝试打开任务资源目录。", "success");
+    showToast(`已打开资源位置：${location.job_dir}`);
+    return;
+  }
+
+  await navigator.clipboard.writeText(location.job_dir);
+  setStatus("浏览器拦截了目录打开，已复制资源路径。", "success");
+  showToast(`资源路径已复制：${location.job_dir}`);
 }
 
 async function requestJson(url, options = {}) {
@@ -254,6 +383,7 @@ function renderHistory() {
           <p>${escapeHtml(item.result?.summary || item.meta?.status || "无摘要")}</p>
           <div class="history-item-actions">
             <button class="secondary" type="button" data-history-load="${escapeHtml(item.id)}">载入结果</button>
+            <button class="secondary" type="button" data-history-open-location="${escapeHtml(item.id)}">查看资源</button>
             <button class="ghost" type="button" data-history-delete="${escapeHtml(item.id)}">删除</button>
           </div>
         </article>
@@ -344,12 +474,12 @@ function downloadText(filename, content, contentType) {
   URL.revokeObjectURL(url);
 }
 
-async function copyMarkdown() {
-  if (!state.currentResult?.article_markdown) {
-    throw new Error("当前没有可复制的 Markdown。");
+async function copyHtml() {
+  if (!state.currentResult?.article_html) {
+    throw new Error("当前没有可复制的 HTML。");
   }
-  await navigator.clipboard.writeText(state.currentResult.article_markdown);
-  showToast("Markdown 已复制到剪贴板。");
+  await navigator.clipboard.writeText(state.currentResult.article_html);
+  showToast("HTML 已复制到剪贴板。");
 }
 
 function saveCurrentResult() {
@@ -514,17 +644,46 @@ async function refreshJob() {
     renderResult(result);
     saveHistoryEntry(buildHistoryEntry(result.title_candidates?.[0] || `任务 ${jobId}`, result, { jobId }));
     stopPolling();
-    setStatus("任务已完成，结果已加载。", "success");
     showToast("异步任务已完成。");
     return;
   }
   if (detail.status === "FAILED") {
     stopPolling();
-    setStatus(detail.error_message || "任务失败。", "error");
     showToast(detail.error_message || "任务失败。");
     return;
   }
-  setStatus(`任务状态: ${detail.status}`);
+}
+
+async function cleanupJobArtifacts(target) {
+  const jobId = getActiveJobId();
+  if (!jobId) {
+    throw new Error("当前没有可管理文件的 job_id。");
+  }
+
+  const actionLabel = target === "media" ? "下载视频和音频缓存" : "整个任务目录";
+  if (!window.confirm(`确认删除 ${jobId} 的${actionLabel}吗？此操作不可撤销。`)) {
+    setStatus("已取消删除操作。");
+    return;
+  }
+
+  setStatus(`正在删除 ${actionLabel}…`);
+  const data = await requestJson(`${API_PREFIX}/jobs/${jobId}/artifacts?target=${target}`, {
+    method: "DELETE",
+  });
+
+  const deletedCount = data.deleted_paths?.length ?? 0;
+  const missingCount = data.missing_paths?.length ?? 0;
+  if (target === "all") {
+    showToast(`任务文件已清理，删除 ${deletedCount} 项。`);
+  } else {
+    showToast(`媒体缓存已清理，删除 ${deletedCount} 项。`);
+  }
+  setStatus(
+    missingCount
+      ? `删除完成，删除 ${deletedCount} 项，另有 ${missingCount} 项原本不存在。`
+      : `删除完成，删除 ${deletedCount} 项。`,
+    "success",
+  );
 }
 
 async function togglePolling() {
@@ -612,9 +771,15 @@ function registerShortcuts() {
 function bindHistoryActions() {
   historyList.addEventListener("click", (event) => {
     const loadId = event.target.dataset.historyLoad;
+    const openLocationId = event.target.dataset.historyOpenLocation;
     const deleteId = event.target.dataset.historyDelete;
     if (loadId) {
       loadHistoryEntry(loadId);
+    }
+    if (openLocationId) {
+      const item = getLocalArray(STORAGE_KEYS.history).find((entry) => entry.id === openLocationId);
+      const jobId = item?.result?.job_id || item?.meta?.jobId || "";
+      runAction(() => openJobLocation(jobId));
     }
     if (deleteId) {
       deleteFromStorage(STORAGE_KEYS.history, deleteId);
@@ -649,13 +814,13 @@ document.getElementById("fill-text-demo").addEventListener("click", fillTextDemo
 document.getElementById("fill-bilibili-demo").addEventListener("click", fillBilibiliDemo);
 document.getElementById("fill-job-demo").addEventListener("click", fillJobDemo);
 document.getElementById("save-draft").addEventListener("click", saveDraft);
-document.getElementById("copy-markdown").addEventListener("click", () => runAction(copyMarkdown));
-document.getElementById("download-markdown").addEventListener("click", () => {
-  if (!state.currentResult?.article_markdown) {
-    showToast("当前没有可下载的 Markdown。");
+document.getElementById("copy-html").addEventListener("click", () => runAction(copyHtml));
+document.getElementById("download-html").addEventListener("click", () => {
+  if (!state.currentResult?.article_html) {
+    showToast("当前没有可下载的 HTML。");
     return;
   }
-  downloadText("vidscribe-article.md", state.currentResult.article_markdown, "text/markdown;charset=utf-8");
+  downloadText("vidscribe-article.html", state.currentResult.article_html, "text/html;charset=utf-8");
 });
 document.getElementById("download-json").addEventListener("click", () => {
   if (!state.currentResult) {
@@ -665,6 +830,9 @@ document.getElementById("download-json").addEventListener("click", () => {
   downloadText("vidscribe-result.json", JSON.stringify(state.currentResult, null, 2), "application/json;charset=utf-8");
 });
 document.getElementById("save-result").addEventListener("click", () => runAction(async () => saveCurrentResult()));
+openJobLocationButton.addEventListener("click", () => runAction(() => openJobLocation(), "open-job-location"));
+deleteJobMediaButton.addEventListener("click", () => runAction(() => cleanupJobArtifacts("media"), "delete-job-media"));
+deleteJobFilesButton.addEventListener("click", () => runAction(() => cleanupJobArtifacts("all"), "delete-job-files"));
 document.getElementById("clear-result").addEventListener("click", () => {
   clearResultView();
   setStatus("结果已清空。");
@@ -684,3 +852,4 @@ renderHistory();
 renderDrafts();
 bindHistoryActions();
 registerShortcuts();
+syncJobArtifactButtons();

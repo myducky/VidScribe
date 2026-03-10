@@ -3,7 +3,7 @@ from kombu.exceptions import OperationalError
 from app.core.config import get_settings
 from app.core.enums import JobStatus
 from app.core.database import SessionLocal
-from app.models.job import Job
+from app.models.job import Artifact, Job
 from app.tasks.jobs import process_job
 
 
@@ -155,7 +155,7 @@ def test_get_job_detail_and_result(client, db_session):
             "outline": ["背景", "要点", "结论"],
             "highlights": ["亮点"],
             "tags": ["标签"],
-            "article_markdown": "# 正文",
+            "article_html": "<h1>正文</h1>",
             "cover": {"prompt": "prompt", "layout": "layout", "text_on_cover": "封面"},
             "source": {
                 "language": "zh",
@@ -212,7 +212,7 @@ def test_create_job_can_complete_full_async_pipeline(client, monkeypatch):
     assert detail_response.json()["status"] == JobStatus.SUCCESS.value
     assert result_response.json()["job_id"] == job_id
     assert result_response.json()["input_type"] == "raw_text"
-    assert result_response.json()["article_markdown"].startswith("# ")
+    assert result_response.json()["article_html"].startswith("<h1>")
 
     steps = {step["step_name"]: step["status"] for step in detail_response.json()["steps"]}
     assert steps["parse_input"] == "SUCCESS"
@@ -220,3 +220,100 @@ def test_create_job_can_complete_full_async_pipeline(client, monkeypatch):
     assert steps["summarize_content"] == "SUCCESS"
     assert steps["generate_article"] == "SUCCESS"
     assert steps["persist_artifacts"] == "SUCCESS"
+
+
+def test_cleanup_job_media_deletes_download_and_audio_directories(client, db_session):
+    job = Job(
+        input_type="bilibili_url",
+        status=JobStatus.SUCCESS,
+        input_payload={"bilibili_url": "https://www.bilibili.com/video/BV1S5PrzZEzQ"},
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    job_dir = get_settings().storage_path / job.id
+    downloads_dir = job_dir / "downloads"
+    audio_dir = job_dir / "audio"
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    (downloads_dir / "demo.mp4").write_bytes(b"video")
+    (audio_dir / "demo.mp3").write_bytes(b"audio")
+
+    response = client.delete(f"/v1/jobs/{job.id}/artifacts?target=media")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job_id"] == job.id
+    assert payload["target"] == "media"
+    assert str(downloads_dir.resolve()) in payload["deleted_paths"]
+    assert str(audio_dir.resolve()) in payload["deleted_paths"]
+    assert not downloads_dir.exists()
+    assert not audio_dir.exists()
+
+
+def test_cleanup_job_all_deletes_job_directory_and_artifact_rows(client, db_session):
+    job = Job(
+        input_type="raw_text",
+        status=JobStatus.SUCCESS,
+        input_payload={"raw_text": "已完成任务"},
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    job_dir = get_settings().storage_path / job.id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    result_path = job_dir / "result.json"
+    result_path.write_text("{}", encoding="utf-8")
+    db_session.add(
+        Artifact(
+            job_id=job.id,
+            artifact_type="result_json",
+            file_path=str(result_path),
+            metadata_json={},
+        )
+    )
+    db_session.commit()
+
+    response = client.delete(f"/v1/jobs/{job.id}/artifacts?target=all")
+
+    assert response.status_code == 200
+    assert response.json()["target"] == "all"
+    assert not job_dir.exists()
+
+    db_session.refresh(job)
+    assert job.artifacts == []
+
+
+def test_cleanup_job_artifacts_returns_404_for_missing_job(client):
+    response = client.delete("/v1/jobs/missing-job/artifacts?target=media")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Job not found"}
+
+
+def test_locate_job_artifacts_returns_local_paths_and_file_url(client, db_session):
+    job = Job(
+        input_type="raw_text",
+        status=JobStatus.SUCCESS,
+        input_payload={"raw_text": "已完成任务"},
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    job_dir = get_settings().storage_path / job.id
+    downloads_dir = job_dir / "downloads"
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+
+    response = client.get(f"/v1/jobs/{job.id}/artifacts/location")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job_id"] == job.id
+    assert payload["job_dir"] == str(job_dir.resolve())
+    assert payload["job_dir_url"] == job_dir.resolve().as_uri()
+    assert payload["downloads_dir"] == str(downloads_dir.resolve())
+    assert payload["job_dir_exists"] is True
+    assert payload["downloads_dir_exists"] is True

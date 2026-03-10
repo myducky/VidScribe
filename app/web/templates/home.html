@@ -45,7 +45,7 @@
                 <li>优先用公开 B 站链接，稳定性最好。</li>
                 <li>抖音只做尽力解析，建议同时准备回退文本。</li>
                 <li>长任务切到异步模式，避免同步等待过久。</li>
-                <li>结果支持复制 Markdown 和下载 JSON。</li>
+                <li>结果支持复制 HTML 和下载 JSON。</li>
               </ul>
             </article>
             <article class="tip-card compact">
@@ -239,10 +239,13 @@
           </div>
 
           <div class="result-actions">
-            <button id="copy-markdown" class="secondary" type="button">复制 Markdown</button>
-            <button id="download-markdown" class="secondary" type="button">下载 Markdown</button>
+            <button id="copy-html" class="secondary" type="button">复制 HTML</button>
+            <button id="download-html" class="secondary" type="button">下载 HTML</button>
             <button id="download-json" class="secondary" type="button">下载 JSON</button>
             <button id="save-result" class="secondary" type="button">保存到最近记录</button>
+            <button id="open-job-location" class="secondary" type="button">查看资源位置</button>
+            <button id="delete-job-media" class="ghost" type="button">删除下载视频</button>
+            <button id="delete-job-files" class="ghost" type="button">删除任务文件</button>
             <button id="clear-result" class="ghost" type="button">清空结果</button>
           </div>
 
@@ -270,12 +273,12 @@
               <article class="result-card article-card article-card-featured">
                 <div class="result-block-head">
                   <div>
-                    <h3>文章 Markdown</h3>
-                    <p class="result-hint">主阅读区。长内容优先在这里看，复制和下载操作保留在上方。</p>
+                    <h3>文章 HTML</h3>
+                    <p class="result-hint">主阅读区会直接渲染文章效果，复制和下载操作保留在上方。</p>
                   </div>
-                  <span class="badge subtle">适合直接复制或下载</span>
+                  <span class="badge subtle">适合直接发布或对接接口</span>
                 </div>
-                <pre id="result-article" class="article-output">暂无</pre>
+                <div id="result-article" class="article-output">暂无</div>
               </article>
 
               <article class="status-card step-card">

@@ -14,7 +14,7 @@ def test_analyze_text_works_end_to_end(client):
     assert body["input_type"] == "raw_text"
     assert len(body["title_candidates"]) == 3
     assert body["summary"]
-    assert body["article_markdown"].startswith("# ")
+    assert body["article_html"].startswith("<h1>")
 
 
 def test_analyze_text_returns_503_when_llm_unavailable(client, monkeypatch):

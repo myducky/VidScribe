@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
+from app.core.enums import ArtifactCleanupTarget
 from app.core.errors import DomainError, InvalidMediaError
 from app.core.logging import logger
 from app.models.job import Job
@@ -25,6 +26,8 @@ from app.schemas.responses import (
     CreateJobResponse,
     DouyinProbeResponse,
     HealthResponse,
+    JobArtifactsCleanupResponse,
+    JobArtifactsLocationResponse,
     JobDetailResponse,
     VideoProbeResponse,
 )
@@ -102,6 +105,53 @@ def get_job_result(job_id: str, db: Session = Depends(get_db)) -> JobResultSchem
     if not job.result_payload:
         raise HTTPException(status_code=404, detail="Job result not ready")
     return JobResultSchema.model_validate(job.result_payload)
+
+
+@router.delete("/jobs/{job_id}/artifacts", response_model=JobArtifactsCleanupResponse, tags=["jobs"])
+def cleanup_job_artifacts(
+    job_id: str,
+    target: ArtifactCleanupTarget,
+    db: Session = Depends(get_db),
+    service: JobService = Depends(get_job_service),
+) -> JobArtifactsCleanupResponse:
+    try:
+        result = service.cleanup_job_artifacts(db, job_id, target)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return JobArtifactsCleanupResponse(
+        job_id=result.job_id,
+        target=result.target,
+        deleted_paths=result.deleted_paths,
+        missing_paths=result.missing_paths,
+    )
+
+
+@router.get("/jobs/{job_id}/artifacts/location", response_model=JobArtifactsLocationResponse, tags=["jobs"])
+def locate_job_artifacts(
+    job_id: str,
+    db: Session = Depends(get_db),
+    service: JobService = Depends(get_job_service),
+) -> JobArtifactsLocationResponse:
+    try:
+        result = service.locate_job_artifacts(db, job_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return JobArtifactsLocationResponse(
+        job_id=result.job_id,
+        job_dir=result.job_dir,
+        job_dir_url=result.job_dir_url,
+        downloads_dir=result.downloads_dir,
+        audio_dir=result.audio_dir,
+        result_json_path=result.result_json_path,
+        transcript_clean_path=result.transcript_clean_path,
+        article_html_path=result.article_html_path,
+        job_dir_exists=result.job_dir_exists,
+        downloads_dir_exists=result.downloads_dir_exists,
+        audio_dir_exists=result.audio_dir_exists,
+        result_json_exists=result.result_json_exists,
+        transcript_clean_exists=result.transcript_clean_exists,
+        article_html_exists=result.article_html_exists,
+    )
 
 
 @router.post("/analyze-text", response_model=AnalyzeTextResponse, tags=["analysis"])

@@ -494,7 +494,46 @@ pre {
   color: #22303a;
   font-size: 1.02rem;
   line-height: 2;
-  white-space: pre-wrap;
+}
+
+.article-output h1,
+.article-output h2,
+.article-output h3,
+.article-output p,
+.article-output ul,
+.article-output ol,
+.article-output blockquote {
+  margin: 0 0 1rem;
+}
+
+.article-output h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.article-output h2 {
+  font-size: 1.45rem;
+  line-height: 1.3;
+}
+
+.article-output h3 {
+  font-size: 1.15rem;
+  line-height: 1.4;
+}
+
+.article-output ul,
+.article-output ol {
+  padding-left: 1.4rem;
+}
+
+.article-output li + li {
+  margin-top: 0.45rem;
+}
+
+.article-output blockquote {
+  padding-left: 1rem;
+  border-left: 3px solid rgba(177, 77, 44, 0.28);
+  color: #51606d;
 }
 
 .article-output::selection,

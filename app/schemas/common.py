@@ -28,7 +28,7 @@ class JobResultSchema(BaseModel):
     outline: list[str] = Field(default_factory=list)
     highlights: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
-    article_markdown: str = ""
+    article_html: str = ""
     cover: CoverSchema
     source: SourceSchema
 

@@ -15,7 +15,7 @@ class StubLLMClient:
 
 
 def test_article_writer_prompt_includes_author_persona_and_style_constraints():
-    llm = StubLLMClient("markdown")
+    llm = StubLLMClient("<h1>文章</h1>")
     writer = ArticleWriter(llm, Settings())
 
     writer.generate(
@@ -30,10 +30,12 @@ def test_article_writer_prompt_includes_author_persona_and_style_constraints():
     )
 
     system_prompt, user_prompt = llm.calls[0]
+    assert "clean HTML" in system_prompt
     assert "长期趋势研究者" in system_prompt
     assert "不喊口号" in system_prompt
-    assert "不要使用“首先、其次、再次、最后、综上所述”" in system_prompt
+    assert "HTML 输出" in system_prompt
     assert "优先写出判断、观察和结构变化" in user_prompt
+    assert "不要输出 Markdown" in user_prompt
 
 
 def test_summarizer_prompt_includes_trend_and_structural_change_guidance():
@@ -63,6 +65,7 @@ def test_article_writer_fallback_uses_more_natural_observation_style():
         },
     )
 
+    assert article.startswith("<h1>")
     assert "这件事真正值得注意的地方在于" in article
     assert "很多人会先盯着表层信息" in article
     assert "如果把时间维度稍微拉长一点看" in article
@@ -71,7 +74,7 @@ def test_article_writer_fallback_uses_more_natural_observation_style():
 def test_prompt_library_reads_sections_from_file(tmp_path):
     prompt_file = tmp_path / "writing_style.md"
     prompt_file.write_text(
-        "## article_persona\n人格A\n\n## article_requirements\n要求B\n\n## summarizer_style\n风格C\n",
+        "## article_persona\n人格A\n\n## article_requirements\n要求B\n\n## summarizer_style\n风格C\n\n## transcript_refiner_style\n风格D\n",
         encoding="utf-8",
     )
 
@@ -80,3 +83,4 @@ def test_prompt_library_reads_sections_from_file(tmp_path):
     assert library.get("article_persona") == "人格A"
     assert library.get("article_requirements") == "要求B"
     assert library.get("summarizer_style") == "风格C"
+    assert library.get("transcript_refiner_style") == "风格D"

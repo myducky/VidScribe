@@ -216,7 +216,7 @@ class PipelineService:
                         self._mark_step(db, job, "transcribe_audio", StepStatus.SUCCESS)
 
             self._mark_step(db, job, "clean_transcript", StepStatus.RUNNING)
-            transcript_clean = self.deps.transcript_cleaner.clean(transcript_raw)
+            transcript_clean = self.deps.transcript_cleaner.clean(transcript_raw, language=source_language)
             if not transcript_clean:
                 raise EmptyTranscriptError("No usable transcript content was produced from the input.")
             self._mark_step(db, job, "clean_transcript", StepStatus.SUCCESS)
@@ -226,7 +226,7 @@ class PipelineService:
             self._mark_step(db, job, "summarize_content", StepStatus.SUCCESS)
 
             self._mark_step(db, job, "generate_article", StepStatus.RUNNING)
-            article_markdown = self.deps.article_writer.generate(
+            article_html = self.deps.article_writer.generate(
                 transcript_clean,
                 structured_summary,
                 desired_length=desired_length,
@@ -249,7 +249,7 @@ class PipelineService:
                 outline=structured_summary["outline"],
                 highlights=structured_summary["highlights"],
                 tags=structured_summary["tags"],
-                article_markdown=article_markdown,
+                article_html=article_html,
                 cover=CoverSchema(**cover),
                 source=SourceSchema(
                     language=source_language,
@@ -263,8 +263,10 @@ class PipelineService:
             job_dir = self.settings.storage_path / job.id
             result_path = self.deps.result_exporter.export_json(result, job_dir / "result.json")
             transcript_path = self.deps.result_exporter.export_text(transcript_clean, job_dir / "transcript_clean.txt")
+            article_path = self.deps.result_exporter.export_text(article_html, job_dir / "article.html")
             db.add(Artifact(job_id=job.id, artifact_type="result_json", file_path=str(result_path), metadata_json={}))
             db.add(Artifact(job_id=job.id, artifact_type="transcript_clean", file_path=str(transcript_path), metadata_json={}))
+            db.add(Artifact(job_id=job.id, artifact_type="article_html", file_path=str(article_path), metadata_json={}))
             self._mark_step(db, job, "persist_artifacts", StepStatus.SUCCESS)
 
             job.status = JobStatus.SUCCESS

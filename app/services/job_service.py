@@ -5,6 +5,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.core.enums import ArtifactCleanupTarget
 from app.core.enums import InputType, JobStatus
 from app.models.job import Job
 from app.schemas.common import JobResultSchema
@@ -13,6 +14,7 @@ from app.schemas.responses import AnalyzeRemoteVideoResponse, DouyinProbeRespons
 from app.services.article_writer import ArticleWriter
 from app.services.cover_prompt_generator import CoverPromptGenerator
 from app.services.input_resolver import InputResolver
+from app.services.job_artifact_manager import ArtifactLocationResult, CleanupResult, JobArtifactManager
 from app.services.llm_client import LLMClient
 from app.services.pipeline import PipelineDependencies, PipelineService
 from app.services.result_exporter import ResultExporter
@@ -32,13 +34,14 @@ class JobService:
             video_downloader=VideoDownloader(settings),
             audio_extractor=AudioExtractor(),
             transcriber=Transcriber(settings),
-            transcript_cleaner=TranscriptCleaner(),
+            transcript_cleaner=TranscriptCleaner(llm_client, settings),
             summarizer=Summarizer(llm_client, settings),
             article_writer=ArticleWriter(llm_client, settings),
             cover_prompt_generator=CoverPromptGenerator(llm_client),
             result_exporter=ResultExporter(),
         )
         self.pipeline = PipelineService(settings, deps)
+        self.job_artifact_manager = JobArtifactManager(settings)
 
     def create_job(self, db: Session, payload: CreateJobRequest) -> Job:
         input_payload = payload.model_dump(mode="json")
@@ -162,3 +165,9 @@ class JobService:
             detail=result.detail,
             resolved_video_id=result.resolved_video_id,
         )
+
+    def cleanup_job_artifacts(self, db: Session, job_id: str, target: ArtifactCleanupTarget) -> CleanupResult:
+        return self.job_artifact_manager.cleanup(db, job_id, target)
+
+    def locate_job_artifacts(self, db: Session, job_id: str) -> ArtifactLocationResult:
+        return self.job_artifact_manager.locate(db, job_id)

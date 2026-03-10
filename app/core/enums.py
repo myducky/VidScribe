@@ -21,3 +21,8 @@ class StepStatus(str, Enum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     SKIPPED = "SKIPPED"
+
+
+class ArtifactCleanupTarget(str, Enum):
+    MEDIA = "media"
+    ALL = "all"

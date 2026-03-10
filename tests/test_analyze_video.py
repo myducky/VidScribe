@@ -4,7 +4,7 @@ import subprocess
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal
-from app.core.errors import InvalidMediaError
+from app.core.errors import InvalidMediaError, RemoteVideoDownloadError
 from app.core.enums import InputType, JobStatus
 from app.models.job import Job
 from app.schemas.common import CoverSchema, JobResultSchema, SourceSchema
@@ -23,7 +23,7 @@ def _fake_video_result(file_path: Path) -> JobResultSchema:
         outline=["背景", "要点", "结论"],
         highlights=["亮点"],
         tags=["视频"],
-        article_markdown="# 视频分析结果",
+        article_html="<h1>视频分析结果</h1>",
         cover=CoverSchema(
             prompt="prompt",
             layout="layout",
@@ -84,7 +84,7 @@ def test_analyze_video_runs_primary_pipeline_successfully(client, monkeypatch, t
     assert body["input_type"] == "uploaded_video"
     assert body["status"] == JobStatus.SUCCESS.value
     assert body["source"]["transcript_raw"] == "这是上传视频主链路里的转写文本。"
-    assert body["article_markdown"].startswith("# ")
+    assert body["article_html"].startswith("<h1>")
 
     session = SessionLocal()
     try:
@@ -94,7 +94,7 @@ def test_analyze_video_runs_primary_pipeline_successfully(client, monkeypatch, t
         assert steps["extract_audio"] == "SUCCESS"
         assert steps["transcribe_audio"] == "SUCCESS"
         assert steps["persist_artifacts"] == "SUCCESS"
-        assert len(job.artifacts) == 2
+        assert len(job.artifacts) == 3
     finally:
         session.close()
 
@@ -163,7 +163,7 @@ def test_analyze_remote_video_returns_result_for_bilibili_url(client, monkeypatc
             outline=["背景", "要点", "结论"],
             highlights=["亮点"],
             tags=["B站"],
-            article_markdown="# 远程视频分析结果",
+            article_html="<h1>远程视频分析结果</h1>",
             cover=CoverSchema(
                 prompt="prompt",
                 layout="layout",
@@ -218,7 +218,7 @@ def test_analyze_remote_video_runs_primary_pipeline_without_fallback(client, mon
     assert body["input_type"] == "bilibili_url"
     assert body["status"] == JobStatus.SUCCESS.value
     assert body["source"]["transcript_raw"] == "这是远程视频主链路里的转写文本。"
-    assert body["article_markdown"].startswith("# ")
+    assert body["article_html"].startswith("<h1>")
 
 
 def test_analyze_remote_video_returns_422_for_unsupported_platform(client, monkeypatch):
@@ -236,6 +236,21 @@ def test_analyze_remote_video_returns_422_for_unsupported_platform(client, monke
     assert response.json() == {
         "detail": "Unsupported remote video URL. Use a public Bilibili link, or upload the video directly."
     }
+
+
+def test_analyze_remote_video_returns_503_for_remote_download_failure(client, monkeypatch):
+    def fake_run_remote_video_analysis(_self: JobService, _db, _payload) -> JobResultSchema:
+        raise RemoteVideoDownloadError("Bilibili download failed; use raw_text or uploaded_video fallback.")
+
+    monkeypatch.setattr(JobService, "run_remote_video_analysis", fake_run_remote_video_analysis)
+
+    response = client.post(
+        "/v1/analyze-remote-video",
+        json={"video_url": "https://www.bilibili.com/video/BV1S5PrzZEzQ"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Bilibili download failed; use raw_text or uploaded_video fallback."}
 
 
 def test_audio_extractor_falls_back_to_imageio_ffmpeg_binary(monkeypatch, tmp_path):
@@ -295,3 +310,32 @@ def test_transcriber_exposes_ffmpeg_alias_on_path(monkeypatch, tmp_path):
         settings.storage_dir = original_storage_dir
         os.environ["PATH"] = original_path
         resolve_ffmpeg_executable.cache_clear()
+
+
+def test_transcriber_passes_initial_prompt_to_whisper(monkeypatch, tmp_path):
+    settings = get_settings()
+    original_prompt = settings.whisper_initial_prompt
+    settings.whisper_initial_prompt = "请优先识别星巴克和抖音。"
+
+    captured_kwargs: dict[str, str] = {}
+
+    class FakeModel:
+        def transcribe(self, _audio_path: str, **kwargs: str) -> dict[str, str]:
+            captured_kwargs.update(kwargs)
+            return {"text": "转写文本", "language": "zh"}
+
+    audio_path = tmp_path / "clip.mp3"
+    audio_path.write_bytes(b"audio")
+
+    try:
+        transcriber = Transcriber(settings)
+        monkeypatch.setattr(transcriber, "_ensure_ffmpeg_on_path", lambda: None)
+        monkeypatch.setattr(transcriber, "_load_model", lambda: FakeModel())
+
+        text, language = transcriber.transcribe(audio_path)
+
+        assert text == "转写文本"
+        assert language == "zh"
+        assert captured_kwargs == {"initial_prompt": "请优先识别星巴克和抖音。"}
+    finally:
+        settings.whisper_initial_prompt = original_prompt

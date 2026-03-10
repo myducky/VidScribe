@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     openai_timeout_sec: int = Field(default=60, alias="OPENAI_TIMEOUT_SEC")
 
     whisper_model: str = Field(default="base", alias="WHISPER_MODEL")
+    whisper_initial_prompt: str = Field(
+        default=(
+            "以下音频以中文普通话口播为主，常见于短视频、电商、品牌、消费和财经语境。"
+            "请优先准确识别专有名词、品牌名、平台名、产品名和数字表达，"
+            "使用自然的简体中文输出，并补充必要标点。"
+            "遇到同音词时，优先选择最常见、最符合上下文的正确词形。"
+            "例如“抖音”“星巴克”“瑞幸”“小红书”“直播间”“GMV”。"
+        ),
+        alias="WHISPER_INITIAL_PROMPT",
+    )
     storage_dir: str = Field(default="storage", alias="STORAGE_DIR")
     max_upload_mb: int = Field(default=300, alias="MAX_UPLOAD_MB")
     douyin_cookie_file: str | None = Field(default=None, alias="DOUYIN_COOKIE_FILE")

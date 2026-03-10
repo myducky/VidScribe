@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 import yt_dlp
 
 from app.core.config import Settings
+from app.core.errors import RemoteVideoDownloadError
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,7 @@ class VideoDownloader:
                 return downloaded
         except Exception as exc:  # pragma: no cover
             logger.warning("Douyin download failed: %s", exc)
-            raise RuntimeError("Douyin download failed; use raw_text or uploaded_video fallback.") from exc
+            raise RemoteVideoDownloadError("Douyin download failed; use raw_text or uploaded_video fallback.") from exc
 
     def download_bilibili_video(self, url: str, output_dir: Path) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -118,7 +119,7 @@ class VideoDownloader:
                 return downloaded
         except Exception as exc:  # pragma: no cover
             logger.warning("Bilibili download failed: %s", exc)
-            raise RuntimeError("Bilibili download failed; use raw_text or uploaded_video fallback.") from exc
+            raise RemoteVideoDownloadError("Bilibili download failed; use raw_text or uploaded_video fallback.") from exc
 
     @staticmethod
     def normalize_douyin_url(url: str) -> tuple[str, str | None]:
