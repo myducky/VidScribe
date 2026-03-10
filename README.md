@@ -62,6 +62,7 @@ REDIS_URL=redis://redis:6379/0
 CELERY_BROKER_URL=redis://redis:6379/0
 CELERY_RESULT_BACKEND=redis://redis:6379/1
 
+# OpenAI 兼容接口配置；也可用于阿里云百炼 / 千问兼容模式
 OPENAI_BASE_URL=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
@@ -77,11 +78,25 @@ DOUYIN_COOKIES_FROM_BROWSER=
 ```
 
 说明：
+- 这里的 `OPENAI_*` 是“OpenAI 兼容接口”配置名，不限定上游厂商
+- 如果你接的是千问兼容模式，通常需要同时设置：
+  - `OPENAI_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1`
+  - `OPENAI_API_KEY=<你的 DashScope Key>`
+  - `OPENAI_MODEL=qwen-plus` 或你实际启用的千问模型名
 - 如果没有配置 OpenAI 兼容接口，系统会退回本地确定性生成逻辑，方便开发联调
 - 当抖音要求新鲜 cookies 时，可以配置 `DOUYIN_COOKIE_FILE` 或 `DOUYIN_COOKIES_FROM_BROWSER`
 - 两者同时设置时，优先使用 `DOUYIN_COOKIE_FILE`
 - 可以运行 `python scripts/check_llm.py` 检查当前是否真的启用了真实模型
 - 可以直接编辑 `app/prompts/writing_style.md` 调整写作人格和文风，无需修改 Python 代码
+
+千问兼容模式示例：
+
+```env
+OPENAI_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+OPENAI_API_KEY=sk-xxxx
+OPENAI_MODEL=qwen-plus
+OPENAI_TIMEOUT_SEC=60
+```
 
 ## 启动方式
 
