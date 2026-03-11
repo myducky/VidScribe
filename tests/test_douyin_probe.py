@@ -173,6 +173,21 @@ def test_video_downloader_includes_cookie_file_option():
     assert "cookiesfrombrowser" not in options
 
 
+def test_video_downloader_includes_retry_timeout_and_ipv4_options():
+    settings = Settings(
+        VIDEO_DOWNLOAD_SOCKET_TIMEOUT_SEC=35,
+        VIDEO_DOWNLOAD_RETRIES=4,
+        VIDEO_DOWNLOAD_FORCE_IPV4=True,
+    )
+
+    options = VideoDownloader(settings)._build_options(download=False)
+
+    assert options["socket_timeout"] == 35
+    assert options["retries"] == 4
+    assert options["fragment_retries"] == 4
+    assert options["source_address"] == "0.0.0.0"
+
+
 def test_video_downloader_uses_merged_audio_video_format_for_download(tmp_path):
     options = VideoDownloader()._build_options(download=True, output_dir=tmp_path)
 
@@ -188,6 +203,11 @@ def test_video_downloader_includes_browser_cookie_option():
 
     assert options["cookiesfrombrowser"] == ("chrome",)
     assert "cookiefile" not in options
+
+
+def test_video_downloader_classifies_ssl_and_timeout_failures_as_network_errors():
+    assert VideoDownloader._classify_probe_error("Read timed out while downloading media") == "network_error"
+    assert VideoDownloader._classify_probe_error("SSL: UNEXPECTED_EOF_WHILE_READING") == "network_error"
 
 
 def test_download_douyin_video_uses_normalized_video_url(monkeypatch, tmp_path):

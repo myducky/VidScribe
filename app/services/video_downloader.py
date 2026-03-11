@@ -148,6 +148,12 @@ class VideoDownloader:
             "quiet": True,
             "noplaylist": True,
         }
+        if self.settings:
+            options["socket_timeout"] = self.settings.video_download_socket_timeout_sec
+            options["retries"] = self.settings.video_download_retries
+            options["fragment_retries"] = self.settings.video_download_retries
+            if self.settings.video_download_force_ipv4:
+                options["source_address"] = "0.0.0.0"
         if download:
             if output_dir is None:
                 raise ValueError("output_dir is required when download=True")
@@ -199,7 +205,14 @@ class VideoDownloader:
             return "cookies_required"
         if "unsupported url" in lowered:
             return "unsupported_url"
-        if "failed to resolve" in lowered or "nodename nor servname provided" in lowered:
+        if (
+            "failed to resolve" in lowered
+            or "nodename nor servname provided" in lowered
+            or "read timed out" in lowered
+            or "ssl:" in lowered
+            or "unexpected eof" in lowered
+            or "connection reset" in lowered
+        ):
             return "network_error"
         return "download_failed"
 

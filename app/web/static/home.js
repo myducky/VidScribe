@@ -577,23 +577,50 @@ async function probeRemoteUrl() {
 }
 
 async function runRemoteAnalysis() {
-  setStatus("正在同步分析远程视频…");
+  setStatus("正在提交远程视频任务…");
+  const remoteUrl = getTextValue("remote-url");
+  const isDouyin = remoteUrl.includes("douyin.com") || remoteUrl.includes("v.douyin.com");
+  const isBilibili = remoteUrl.includes("bilibili.com") || remoteUrl.includes("b23.tv");
+  if (!isDouyin && !isBilibili) {
+    throw new Error("当前只支持 B 站或抖音链接。请先探测链接，或改用上传视频。");
+  }
   const fallback = getTextValue("remote-fallback");
   const payload = {
-    video_url: getTextValue("remote-url"),
-    raw_text: fallback || null,
+    input_type: isDouyin ? "douyin_url" : "bilibili_url",
+    raw_text: fallback || undefined,
     desired_length: getNumberValue("remote-length"),
     language: getTextValue("remote-language") || "zh",
   };
-  const data = await requestJson(`${API_PREFIX}/analyze-remote-video`, {
+  if (payload.input_type === "douyin_url") {
+    payload.douyin_url = remoteUrl;
+  } else {
+    payload.bilibili_url = remoteUrl;
+  }
+
+  const data = await requestJson(`${API_PREFIX}/jobs`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  renderResult(data);
-  saveHistoryEntry(buildHistoryEntry(data.title_candidates?.[0] || "远程视频分析结果", data));
-  setStatus("远程视频分析完成。", "success");
-  showToast("远程视频分析完成。");
+  jobIdInput.value = data.job_id;
+  renderPre(resultMeta, JSON.stringify(data, null, 2));
+  updateOverview({
+    status: data.status,
+    input_type: payload.input_type,
+    source: { language: payload.language, duration_sec: 0 },
+  });
+  setStatus(`远程视频任务已提交: ${data.job_id}`, "success");
+  showToast("远程视频任务已提交，开始轮询进度。");
+  await refreshJob();
+  if (!state.pollTimer) {
+    state.pollTimer = window.setInterval(() => {
+      refreshJob().catch((error) => {
+        stopPolling();
+        setStatus(error.message, "error");
+        showToast(error.message);
+      });
+    }, 3000);
+  }
 }
 
 async function runUploadAnalysis() {
